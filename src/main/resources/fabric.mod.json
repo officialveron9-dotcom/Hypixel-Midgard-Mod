@@ -1,0 +1,30 @@
+{
+	"schemaVersion": 1,
+	"id": "midgard",
+	"version": "${version}",
+	"name": "Midgard",
+	"description": "",
+	"authors": [
+		"Midgard"
+	],
+	"contact": {},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.midgard.Midgard"
+		],
+		"modmenu": [
+			"com.midgard.MidgardModMenu"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": ">=1.21.11 <1.22",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"recommends": {
+		"modmenu": "*"
+	}
+}

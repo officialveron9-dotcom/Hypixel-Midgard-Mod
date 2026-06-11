@@ -1,0 +1,13 @@
+{
+  "name": "midgard-price-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Aggregiert Hypixel SkyBlock Bazaar + Auktionshaus + Jacob-Zeitplan zu einer kompakten prices.json.",
+  "scripts": {
+    "start": "node aggregate.mjs"
+  },
+  "dependencies": {
+    "prismarine-nbt": "^2.5.0"
+  }
+}

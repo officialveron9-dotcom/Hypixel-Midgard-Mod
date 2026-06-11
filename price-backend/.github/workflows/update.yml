@@ -1,0 +1,36 @@
+name: Update Prices
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # alle 5 Minuten (GitHub-Minimum)
+  workflow_dispatch:          # erlaubt manuelles Starten über die Actions-Seite
+
+permissions:
+  contents: write             # zum Veröffentlichen auf dem gh-pages-Branch
+
+concurrency:
+  group: prices
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Abhängigkeiten installieren
+        run: npm install
+
+      - name: Preise aggregieren
+        run: node aggregate.mjs
+
+      - name: Auf GitHub Pages veröffentlichen
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: gh-pages

@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+
+# Fabric / Loom
+run/
+remappedSrc/
+
+# Preis-Backend (Node) – generiert/groß, nicht versionieren
+price-backend/node_modules/
+price-backend/public/
+price-backend/package-lock.json
+price-backend/.git/
+
+# OS
+.DS_Store
+Thumbs.db

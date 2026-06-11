@@ -1,0 +1,10 @@
+{
+	"providers": [
+		{
+			"type": "ttf",
+			"file": "midgard:roboto_bold.ttf",
+			"size": 9.0,
+			"oversample": 8.0
+		}
+	]
+}
