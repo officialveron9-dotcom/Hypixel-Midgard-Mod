@@ -29,6 +29,10 @@ public class ModConfig {
 	public boolean showBackground = true;
 	/** Gewählte globale Schriftart (key aus MidgardFont.FONTS; "" = aus). */
 	public String globalFontName = "";
+	/** Bazaar-Preise im Item-Tooltip anzeigen. */
+	public boolean showPrices = true;
+	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
+	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 
 	public int hudX = 5;
 	public int hudY = 40;

@@ -92,6 +92,8 @@ public class ConfigScreen extends Screen {
 	private final List<Clickable> clickables = new ArrayList<>();
 	private final Map<String, Float> anim = new HashMap<>();
 	private final java.util.Set<EventCategory> expanded = new java.util.HashSet<>();
+	private boolean fontExpanded = false;
+	private final Map<String, com.midgard.render.GlyphAtlas> fontPrev = new HashMap<>();
 
 	private long lastNanos = 0;
 	private float dt;
@@ -170,6 +172,23 @@ public class ConfigScreen extends Screen {
 				scroll = 0;
 			}));
 			y += rowH + 5;
+		}
+
+		// Pflicht-Quellenangabe (elitebot.dev liefert den Jacob-Plan).
+		String link = "Daten: elitebot.dev";
+		int linkX = px + 14;
+		int linkY = py + ph - 20;
+		int linkW = txtW(link, false);
+		boolean linkHover = mouseX >= linkX && mouseX <= linkX + linkW && mouseY >= linkY - 2 && mouseY <= linkY + 11;
+		txt(context, link, linkX, linkY, linkHover ? ACCENT : TEXT_DIM, false);
+		clickables.add(new Clickable(linkX, linkY - 2, linkX + linkW, linkY + 11,
+				() -> openUrl("https://elitebot.dev/")));
+	}
+
+	private void openUrl(String url) {
+		try {
+			net.minecraft.util.Util.getOperatingSystem().open(java.net.URI.create(url));
+		} catch (Exception ignored) {
 		}
 	}
 
@@ -251,13 +270,18 @@ public class ConfigScreen extends Screen {
 					cfg.onlyOnSkyblock = !cfg.onlyOnSkyblock;
 					cfg.save();
 				}));
-		out.add(buttonRow(context, mouseX, mouseY, cardX, cardW, pngIcon("size"),
-				"Schriftart", "Schriftart im ganzen Spiel (klicken zum Wechseln).",
-				com.midgard.render.MidgardFont.display(cfg.globalFontName), () -> {
-					cfg.globalFontName = com.midgard.render.MidgardFont.next(cfg.globalFontName);
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("gem"),
+				"Bazaar-Preise", "Kauf-/Verkaufspreis im Item-Tooltip anzeigen.",
+				() -> cfg.showPrices, () -> {
+					cfg.showPrices = !cfg.showPrices;
 					cfg.save();
-					com.midgard.render.MidgardFont.apply(cfg.globalFontName);
 				}));
+		out.add(fontHeaderRow(context, mouseX, mouseY, cardX, cardW));
+		if (fontExpanded) {
+			for (com.midgard.render.MidgardFont.FontOption f : com.midgard.render.MidgardFont.FONTS) {
+				out.add(fontOptionRow(context, mouseX, mouseY, cardX, cardW, f));
+			}
+		}
 		out.add(buttonRow(context, mouseX, mouseY, cardX, cardW, pngIcon("move"),
 				"HUD bearbeiten", "Position, Größe, Icons & Presets.", "Öffnen",
 				() -> {
@@ -375,6 +399,66 @@ public class ConfigScreen extends Screen {
 				cfg.save();
 			}));
 		});
+	}
+
+	// ---- Schriftart-Dropdown (mit Vorschau, lädt nur bei Auswahl neu) -----
+
+	private Row fontHeaderRow(DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
+		return new Row(CARD_H + CARD_GAP, y -> {
+			boolean hover = hovering(mouseX, mouseY, cardX, y, cardW, CARD_H);
+			float hoverT = animate("fonthdr", hover, 14f);
+			cardFrame(context, cardX, y, cardW, CARD_H, hoverT, TILE_SIZE);
+			drawPngIcon(context, "size", cardX, y, CARD_H, TILE_SIZE);
+			int textX = cardX + 8 + TILE_SIZE + 10;
+			txt(context, "Schriftart", textX, y + 8, TEXT, true);
+			// aktuelle Auswahl als Vorschau (in ihrer eigenen Schrift)
+			fontPreview(context, cfg.globalFontName,
+					com.midgard.render.MidgardFont.display(cfg.globalFontName), textX, y + 23, TEXT_DIM);
+			drawCaret(context, cardX + cardW - 22, y + CARD_H / 2, fontExpanded, TEXT_DIM);
+			clickables.add(new Clickable(cardX, y, cardX + cardW, y + CARD_H, () -> fontExpanded = !fontExpanded));
+		});
+	}
+
+	private Row fontOptionRow(DrawContext context, int mouseX, int mouseY, int cardX0, int cardW0,
+			com.midgard.render.MidgardFont.FontOption f) {
+		int indent = 14;
+		int cardX = cardX0 + indent;
+		int cardW = cardW0 - indent;
+		return new Row(EVENT_H + EVENT_GAP, y -> {
+			boolean selected = f.key().equals(cfg.globalFontName);
+			boolean hover = hovering(mouseX, mouseY, cardX, y, cardW, EVENT_H);
+			float hoverT = animate("fopt" + f.key(), hover, 14f);
+			sprite(context, cardX, y, cardW, EVENT_H, lerpColor(CARD, CARD_HOVER, hoverT));
+			if (selected) {
+				sprite(context, cardX, y + 6, 3, EVENT_H - 12, ACCENT);
+			}
+			fontPreview(context, f.key(), f.display(), cardX + 12, y + (EVENT_H - capH() - 2) / 2,
+					selected ? TEXT : TEXT_DIM);
+			clickables.add(new Clickable(cardX, y, cardX + cardW, y + EVENT_H, () -> {
+				cfg.globalFontName = f.key();
+				cfg.save();
+				com.midgard.render.MidgardFont.apply(f.key()); // NUR hier wird neu geladen
+				fontExpanded = false;
+			}));
+		});
+	}
+
+	/** Zeichnet {@code text} in der zu {@code key} gehörenden Schrift (Vorschau, ohne Neuladen). */
+	private void fontPreview(DrawContext c, String key, String text, int x, int yTop, int color) {
+		if (key == null || key.isEmpty()) {
+			txt(c, text, x, yTop, color, false);
+			return;
+		}
+		try {
+			com.midgard.render.GlyphAtlas a = fontPrev.computeIfAbsent(key,
+					k -> new com.midgard.render.GlyphAtlas(com.midgard.render.MidgardFont.ttf(k), "fontprev_" + k));
+			if (a.isReady()) {
+				a.draw(c, text, x, yTop, FONT + 2f, color);
+				return;
+			}
+		} catch (Throwable ignored) {
+		}
+		txt(c, text, x, yTop, color, false);
 	}
 
 	private Row toggleRow(DrawContext context, int mouseX, int mouseY, int cardX, int cardW,

@@ -37,11 +37,14 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-11 (In-Game-Jacob, device-res Schrift, Font-Pack)");
+		System.out.println("[Midgard] init build=2026-06-12 (Preise: Bazaar direkt + AH/Jacob via Backend, AH-Fallback)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
 		com.midgard.render.MidgardFont.register();
+
+		// Bazaar-Preise im Item-Tooltip (direkt von Hypixel, kein Server).
+		com.midgard.price.PriceTooltips.register();
 
 		// Tastenkürzel. Die Keybind-Kategorie ist seit 1.21.6 ein Objekt.
 		KeyBinding.Category category =
@@ -84,6 +87,10 @@ public class Midgard implements ClientModInitializer {
 				tickCounter = 0;
 				SkyblockHook.INSTANCE.update(client);
 				EventManager.INSTANCE.update();
+				com.midgard.price.BazaarData.INSTANCE.maybeRefresh();
+				com.midgard.price.AuctionData.INSTANCE.maybeRefresh();
+				com.midgard.price.PriceApi.INSTANCE.maybeRefresh();
+				com.midgard.price.JacobOnline.INSTANCE.maybeRefresh();
 			}
 		});
 

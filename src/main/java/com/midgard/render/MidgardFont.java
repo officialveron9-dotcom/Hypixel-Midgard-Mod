@@ -23,19 +23,29 @@ import net.minecraft.util.Identifier;
  */
 public final class MidgardFont {
 
-	public record FontOption(String key, String display) {
+	public record FontOption(String key, String display, String ttf) {
 	}
 
-	/** Auswahl-Reihenfolge (key "" = aus → normale Minecraft-Schrift). */
+	/** Auswahl-Reihenfolge (key "" = aus → normale Minecraft-Schrift). ttf = Dateiname für die Vorschau. */
 	public static final List<FontOption> FONTS = List.of(
-			new FontOption("", "Aus (Minecraft)"),
-			new FontOption("roboto", "Roboto"),
-			new FontOption("roboto_bold", "Roboto Fett"),
-			new FontOption("roboto_light", "Roboto Dünn"),
-			new FontOption("roboto_black", "Roboto Schwarz"),
-			new FontOption("opensans", "Open Sans"),
-			new FontOption("montserrat", "Montserrat"),
-			new FontOption("poppins", "Poppins"));
+			new FontOption("", "Aus (Minecraft)", ""),
+			new FontOption("roboto", "Roboto", "roboto_regular"),
+			new FontOption("roboto_bold", "Roboto Fett", "roboto_bold"),
+			new FontOption("roboto_light", "Roboto Dünn", "roboto_light"),
+			new FontOption("roboto_black", "Roboto Schwarz", "roboto_black"),
+			new FontOption("opensans", "Open Sans", "opensans"),
+			new FontOption("montserrat", "Montserrat", "montserrat"),
+			new FontOption("poppins", "Poppins", "poppins"));
+
+	/** TTF-Dateiname für einen Font-Key (für die Vorschau), oder "". */
+	public static String ttf(String key) {
+		for (FontOption f : FONTS) {
+			if (f.key.equals(key)) {
+				return f.ttf;
+			}
+		}
+		return "";
+	}
 
 	private MidgardFont() {
 	}

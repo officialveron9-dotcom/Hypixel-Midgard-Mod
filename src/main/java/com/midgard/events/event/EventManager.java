@@ -8,6 +8,7 @@ import java.util.Map;
 import com.midgard.Midgard;
 import com.midgard.events.config.ModConfig;
 import com.midgard.events.skyblock.SkyblockCalendar;
+import com.midgard.events.skyblock.SkyblockHook;
 
 /**
  * Stellt aus Jacob-API, live erkannten Events und Kalender-Events die fertige,
@@ -29,10 +30,26 @@ public class EventManager {
 		ModConfig cfg = Midgard.config;
 		SkyblockCalendar cal = SkyblockCalendar.INSTANCE;
 
-		// 1) Jacob's Contest aus dem In-Game-Kalender (Datum + Crops), Restzeit
-		//    live über den SkyBlock-Kalender berechnet (driftfrei). Ein Contest
-		//    läuft genau einen SkyBlock-Tag (= 20 reale Minuten).
-		if (cfg.isEventEnabled(EventType.JACOB_CONTEST) && cal.isValid()) {
+		// 1) Jacob's Contest. Quelle: eigenes Backend (prices.json) bevorzugt,
+		//    sonst direkt elitebot (voller Jahresplan → 3–5 sofort), sonst der
+		//    In-Game-Plan (~2). Alle drei liefern den vollen Plan außer In-Game.
+		com.midgard.price.JacobSource jsrc = !cfg.isEventEnabled(EventType.JACOB_CONTEST) ? null
+				: com.midgard.price.PriceApi.INSTANCE.hasJacob() ? com.midgard.price.PriceApi.INSTANCE
+				: com.midgard.price.JacobOnline.INSTANCE.hasJacob() ? com.midgard.price.JacobOnline.INSTANCE
+				: null;
+		if (jsrc != null) {
+			long nowSec = System.currentTimeMillis() / 1000;
+			int n = cfg.getUpcomingEvent(EventType.JACOB_CONTEST);
+			java.util.Map.Entry<Long, List<String>> act = jsrc.jacobActive(nowSec);
+			if (act != null) {
+				list.add(new EventDisplay(EventType.JACOB_CONTEST, "Jacob's Contest", true,
+						act.getKey() + com.midgard.price.PriceApi.CONTEST_SECONDS - nowSec, act.getValue()));
+			}
+			for (java.util.Map.Entry<Long, List<String>> e : jsrc.jacobUpcoming(nowSec, n)) {
+				list.add(new EventDisplay(EventType.JACOB_CONTEST, "Jacob's Contest", false,
+						e.getKey() - nowSec, e.getValue()));
+			}
+		} else if (cfg.isEventEnabled(EventType.JACOB_CONTEST) && cal.isValid()) {
 			int n = cfg.getUpcomingEvent(EventType.JACOB_CONTEST);
 			double horizon = 30 * SkyblockCalendar.REAL_SECONDS_PER_SB_DAY;
 			List<double[]> upStarts = new ArrayList<>();
@@ -114,5 +131,20 @@ public class EventManager {
 				.thenComparingDouble(d -> d.secondsRemaining));
 
 		current = list;
+
+		// Diagnose (~alle 10 s): warum Jacob (nicht) erscheint.
+		if (++diagTick >= 20) {
+			diagTick = 0;
+			SkyblockHook hk = SkyblockHook.INSTANCE;
+			if (hk.onSkyblock) {
+				long shown = list.stream().filter(d -> d.type == EventType.JACOB_CONTEST).count();
+				System.out.println("[Midgard] DIAG jacob: onSB=" + hk.onSkyblock + " calValid=" + cal.isValid()
+						+ " sbDate=" + hk.month + "/" + hk.day
+						+ " gespeichert=" + JacobSchedule.INSTANCE.entries().size()
+						+ " angezeigt=" + shown);
+			}
+		}
 	}
+
+	private int diagTick = 0;
 }
