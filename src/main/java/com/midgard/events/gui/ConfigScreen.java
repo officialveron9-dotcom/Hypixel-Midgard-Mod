@@ -88,6 +88,7 @@ public class ConfigScreen extends Screen {
 	private final ModConfig cfg = Midgard.config;
 	private final List<Tab> tabs = List.of(
 			new Tab("Allgemein", false, 0xFFFFFFFF),
+			new Tab("Auktion", false, 0xFFFFC85C),
 			new Tab("Interface", false, 0xFF57D8FF),
 			new Tab("Events", true, ACCENT),
 			new Tab("Garden", false, 0xFF5BE36B),
@@ -213,6 +214,8 @@ public class ConfigScreen extends Screen {
 			buildGardenRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else if (tab.label().equals("Mining")) {
 			buildMiningRows(rows, context, mouseX, mouseY, cardX, cardW);
+		} else if (tab.label().equals("Auktion")) {
+			buildAuctionRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else if (tab.label().equals("Interface")) {
 			buildInterfaceRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else {
@@ -262,12 +265,6 @@ public class ConfigScreen extends Screen {
 				"Nur in SkyBlock", "HUD nur in SkyBlock anzeigen.",
 				() -> cfg.onlyOnSkyblock, () -> {
 					cfg.onlyOnSkyblock = !cfg.onlyOnSkyblock;
-					cfg.save();
-				}));
-		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("gem"),
-				"Bazaar-Preise", "Kauf-/Verkaufspreis im Item-Tooltip anzeigen.",
-				() -> cfg.showPrices, () -> {
-					cfg.showPrices = !cfg.showPrices;
 					cfg.save();
 				}));
 		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("size"),
@@ -342,6 +339,21 @@ public class ConfigScreen extends Screen {
 		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Contest-Warnung (Chat)",
 				() -> cfg.jacobWarn, () -> {
 					cfg.jacobWarn = !cfg.jacobWarn;
+					cfg.save();
+				}));
+	}
+
+	private void buildAuctionRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("gem"),
+				"Preise anzeigen", "Bazaar- und AH-Preise im Item-Tooltip.",
+				() -> cfg.showPrices, () -> {
+					cfg.showPrices = !cfg.showPrices;
+					cfg.save();
+				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("election"),
+				"Zahlen kürzen", "500.000.000 → 500kk. Aus = immer volle Zahl (überall).",
+				() -> cfg.compactNumbers, () -> {
+					cfg.compactNumbers = !cfg.compactNumbers;
 					cfg.save();
 				}));
 	}

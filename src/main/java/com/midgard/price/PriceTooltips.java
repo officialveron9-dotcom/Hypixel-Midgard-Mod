@@ -97,17 +97,8 @@ public final class PriceTooltips {
 		return id;
 	}
 
-	/** Kompakte Münz-Anzeige: 1.2B / 3.4M / 12.3k / 123. */
+	/** Münz-Anzeige: voll (500.000.000) oder gekürzt (500kk) – zentral in Numbers. */
 	private static String coins(double v) {
-		if (v >= 1_000_000_000d) {
-			return String.format("%.2fB", v / 1_000_000_000d);
-		}
-		if (v >= 1_000_000d) {
-			return String.format("%.2fM", v / 1_000_000d);
-		}
-		if (v >= 1_000d) {
-			return String.format("%.1fk", v / 1_000d);
-		}
-		return String.format("%.1f", v);
+		return com.midgard.util.Numbers.coins(v);
 	}
 }

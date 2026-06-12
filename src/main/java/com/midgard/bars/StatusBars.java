@@ -1,6 +1,5 @@
 package com.midgard.bars;
 
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -158,8 +157,8 @@ public final class StatusBars {
 		return h > 0 ? h : 6;
 	}
 
-	/** Volle Zahl mit Tausenderpunkten. */
+	/** Zahlenanzeige: voll oder gekürzt – zentral in Numbers (Auktion-Tab). */
 	private static String full(long v) {
-		return String.format(Locale.GERMAN, "%,d", v);
+		return com.midgard.util.Numbers.format(v);
 	}
 }

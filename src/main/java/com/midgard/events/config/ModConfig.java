@@ -31,6 +31,8 @@ public class ModConfig {
 	public String globalFontName = "";
 	/** Bazaar-Preise im Item-Tooltip anzeigen. */
 	public boolean showPrices = true;
+	/** Zahlen kürzen (500.000.000 -> 500kk); aus = immer volle Zahl. */
+	public boolean compactNumbers = false;
 	/** Eigene Statusleisten: Leben links, XP mittig, Mana rechts (Text innen). */
 	public boolean customBars = true;
 	/** Borderless-Vollbild: randloses Fenster in Monitorgröße (Alt-Tab ohne Minimieren). */

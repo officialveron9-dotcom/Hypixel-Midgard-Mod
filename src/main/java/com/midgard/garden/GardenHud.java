@@ -286,22 +286,12 @@ public final class GardenHud {
 		return v.startsWith("0") || v.toLowerCase(java.util.Locale.ROOT).contains("empty");
 	}
 
-	/** Volle Zahl mit Tausenderpunkten: 167.924.090. */
+	/** Zahlenanzeige: voll oder gekürzt – zentral in Numbers (Auktion-Tab). */
 	private static String full(long v) {
-		return String.format(java.util.Locale.GERMAN, "%,d", v);
+		return com.midgard.util.Numbers.format(v);
 	}
 
-	/** Kompakte Zahl: 1,2B / 3,4M / 12,3k / 123. */
 	private static String num(long v) {
-		if (v >= 1_000_000_000L) {
-			return String.format("%.1fB", v / 1_000_000_000d);
-		}
-		if (v >= 1_000_000L) {
-			return String.format("%.1fM", v / 1_000_000d);
-		}
-		if (v >= 10_000L) {
-			return String.format("%.1fk", v / 1_000d);
-		}
-		return String.valueOf(v);
+		return com.midgard.util.Numbers.format(v);
 	}
 }
