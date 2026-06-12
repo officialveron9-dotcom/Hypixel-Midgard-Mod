@@ -31,6 +31,18 @@ public class ModConfig {
 	public String globalFontName = "";
 	/** Bazaar-Preise im Item-Tooltip anzeigen. */
 	public boolean showPrices = true;
+
+	// --- Garden (alles einzeln schaltbar) -----------------------------------
+	/** Besucherliste im HUD. */
+	public boolean gardenVisitors = true;
+	/** Schädlinge: Anzahl + befallene Plots (aktueller Plot hervorgehoben). */
+	public boolean gardenPests = true;
+	/** Collection: Zeit bis zum nächsten Rang. */
+	public boolean gardenCollection = true;
+	/** Werkzeug: Cultivating-Level + Fortschritt. */
+	public boolean gardenTool = true;
+	/** Farming-Statistik (Crops/min, Blöcke/s ...). */
+	public boolean gardenStats = true;
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 
@@ -93,38 +105,39 @@ public class ModConfig {
 	}
 
 	// --- HUD-Gruppen (Einzel-Position + Einzel-Größe) ------------------------
+	// Schlüssel = EventType.name() für Event-Gruppen bzw. "GARDEN_*" für Garden.
 
-	public boolean hasGroupPos(EventType type) {
-		return hudGroupX.containsKey(type.name()) && hudGroupY.containsKey(type.name());
+	public boolean hasGroupPos(String key) {
+		return hudGroupX.containsKey(key) && hudGroupY.containsKey(key);
 	}
 
-	public int groupX(EventType type) {
-		return hudGroupX.getOrDefault(type.name(), hudX);
+	public int groupX(String key) {
+		return hudGroupX.getOrDefault(key, hudX);
 	}
 
-	public int groupY(EventType type) {
-		return hudGroupY.getOrDefault(type.name(), hudY);
+	public int groupY(String key) {
+		return hudGroupY.getOrDefault(key, hudY);
 	}
 
-	public void setGroupPos(EventType type, int x, int y) {
-		hudGroupX.put(type.name(), x);
-		hudGroupY.put(type.name(), y);
+	public void setGroupPos(String key, int x, int y) {
+		hudGroupX.put(key, x);
+		hudGroupY.put(key, y);
 	}
 
 	/** Zurück in den normalen Stapel. */
-	public void clearGroupPos(EventType type) {
-		hudGroupX.remove(type.name());
-		hudGroupY.remove(type.name());
+	public void clearGroupPos(String key) {
+		hudGroupX.remove(key);
+		hudGroupY.remove(key);
 	}
 
 	/** Größenfaktor einer HUD-Gruppe (0.5..2.5, Standard 1.0). */
-	public float groupScale(EventType type) {
-		Float f = hudGroupScale.get(type.name());
+	public float groupScale(String key) {
+		Float f = hudGroupScale.get(key);
 		return f == null ? 1f : Math.max(0.5f, Math.min(2.5f, f));
 	}
 
-	public void setGroupScale(EventType type, float value) {
-		hudGroupScale.put(type.name(), Math.max(0.5f, Math.min(2.5f, value)));
+	public void setGroupScale(String key, float value) {
+		hudGroupScale.put(key, Math.max(0.5f, Math.min(2.5f, value)));
 	}
 
 	// --- Laden / Speichern -------------------------------------------------

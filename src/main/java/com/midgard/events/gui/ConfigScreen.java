@@ -88,7 +88,8 @@ public class ConfigScreen extends Screen {
 	private final ModConfig cfg = Midgard.config;
 	private final List<Tab> tabs = List.of(
 			new Tab("Allgemein", false, 0xFFFFFFFF),
-			new Tab("Events", true, ACCENT));
+			new Tab("Events", true, ACCENT),
+			new Tab("Garden", false, 0xFF5BE36B));
 	private final List<Clickable> clickables = new ArrayList<>();
 	private final Map<String, Float> anim = new HashMap<>();
 	private final java.util.Set<EventCategory> expanded = new java.util.HashSet<>();
@@ -219,8 +220,11 @@ public class ConfigScreen extends Screen {
 		int cardW = px + pw - cardX - 18;
 
 		List<Row> rows = new ArrayList<>();
-		if (tabs.get(selectedTab).events()) {
+		Tab tab = tabs.get(selectedTab);
+		if (tab.events()) {
 			buildEventRows(rows, context, mouseX, mouseY, cardX, cardW);
+		} else if (tab.label().equals("Garden")) {
+			buildGardenRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else {
 			buildGeneralRows(rows, context, mouseX, mouseY, cardX, cardW);
 		}
@@ -291,6 +295,39 @@ public class ConfigScreen extends Screen {
 					if (client != null) {
 						client.setScreen(new HudPositionScreen(this));
 					}
+				}));
+	}
+
+	private void buildGardenRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("zoo"),
+				"Besucher", "Alle wartenden Visitors im HUD auflisten.",
+				() -> cfg.gardenVisitors, () -> {
+					cfg.gardenVisitors = !cfg.gardenVisitors;
+					cfg.save();
+				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("spooky"),
+				"Schädlinge", "Anzahl (x/8) + befallene Plots; eigener Plot leuchtet.",
+				() -> cfg.gardenPests, () -> {
+					cfg.gardenPests = !cfg.gardenPests;
+					cfg.save();
+				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("wheat"),
+				"Collection-Rang", "Fortschritt + Zeit bis zum nächsten Collection-Rang.",
+				() -> cfg.gardenCollection, () -> {
+					cfg.gardenCollection = !cfg.gardenCollection;
+					cfg.save();
+				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("size"),
+				"Werkzeug-Level", "Cultivating-Level + Fortschritt des Farm-Werkzeugs.",
+				() -> cfg.gardenTool, () -> {
+					cfg.gardenTool = !cfg.gardenTool;
+					cfg.save();
+				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("election"),
+				"Farming-Statistik", "Beim Farmen: Crops/min und Blöcke/s live.",
+				() -> cfg.gardenStats, () -> {
+					cfg.gardenStats = !cfg.gardenStats;
+					cfg.save();
 				}));
 	}
 

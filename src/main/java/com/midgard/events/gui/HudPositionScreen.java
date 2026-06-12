@@ -47,7 +47,8 @@ public class HudPositionScreen extends Screen {
 	private final ModConfig cfg = Midgard.config;
 	private final List<Clickable> clickables = new ArrayList<>();
 
-	private EventType selected = null;
+	private String selected = null;
+	private String selectedTitle = "";
 	private boolean dragging = false;
 	private boolean dragMoved = false;
 	private int dragOffsetX;
@@ -74,12 +75,12 @@ public class HudPositionScreen extends Screen {
 	}
 
 	private List<GroupRect> layout() {
-		return EventHud.INSTANCE.layout(cfg, previewEvents());
+		return EventHud.INSTANCE.layoutPreview(cfg, previewEvents());
 	}
 
-	private GroupRect rectOf(EventType type) {
+	private GroupRect rectOf(String key) {
 		for (GroupRect r : layout()) {
-			if (r.type() == type) {
+			if (r.key().equals(key)) {
 				return r;
 			}
 		}
@@ -98,11 +99,11 @@ public class HudPositionScreen extends Screen {
 		List<GroupRect> rects = layout();
 		GroupRect hovered = hit(rects, mouseX, mouseY);
 		for (GroupRect r : rects) {
-			if (r.type() == selected) {
+			if (r.key().equals(selected)) {
 				float pulse = (float) (0.5 + 0.5 * Math.sin(System.currentTimeMillis() / 220.0));
 				outline(context, r, 2, withAlpha(ACCENT, 140 + (int) (pulse * 115)));
 				outline(context, r, 4, withAlpha(ACCENT, 30 + (int) (pulse * 60)));
-			} else if (hovered != null && r.type() == hovered.type() && !dragging) {
+			} else if (hovered != null && r.key().equals(hovered.key()) && !dragging) {
 				outline(context, r, 2, HOVER_OUTLINE);
 			}
 		}
@@ -171,7 +172,7 @@ public class HudPositionScreen extends Screen {
 		// Zweite Zeile: Name + Größen-Buttons für das ausgewählte Element.
 		int rowY = panelY + 47;
 		int btnH = 18;
-		String name = selected.displayName;
+		String name = selectedTitle;
 		txt(context, name, panelX + pad, rowY + (btnH - capH()) / 2, ACCENT, true);
 
 		int x = panelX + pad + Math.max(110, txtW(name, true) + 14);
@@ -250,7 +251,8 @@ public class HudPositionScreen extends Screen {
 		}
 		GroupRect r = hit(layout(), mx, my);
 		if (r != null) {
-			selected = r.type();
+			selected = r.key();
+			selectedTitle = r.title();
 			dragging = true;
 			dragMoved = false;
 			dragOffsetX = (int) (mx - r.x());

@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12f (HUD-Text: weicher Schlagschatten statt Umriss)");
+		System.out.println("[Midgard] init build=2026-06-12g (Garden: Besucher, Schaedlinge, Collection, Werkzeug, Farm-Statistik)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -87,6 +87,7 @@ public class Midgard implements ClientModInitializer {
 				tickCounter = 0;
 				SkyblockHook.INSTANCE.update(client);
 				EventManager.INSTANCE.update();
+				com.midgard.garden.GardenData.INSTANCE.update(client);
 				com.midgard.price.PriceApi.INSTANCE.maybeRefresh();
 			}
 		});
