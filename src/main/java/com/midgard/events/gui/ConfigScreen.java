@@ -278,8 +278,11 @@ public class ConfigScreen extends Screen {
 				}));
 		out.add(fontHeaderRow(context, mouseX, mouseY, cardX, cardW));
 		if (fontExpanded) {
-			for (com.midgard.render.MidgardFont.FontOption f : com.midgard.render.MidgardFont.FONTS) {
-				out.add(fontOptionRow(context, mouseX, mouseY, cardX, cardW, f));
+			// Kompaktes Grid statt einer Zeile pro Schrift.
+			List<com.midgard.render.MidgardFont.FontOption> fonts = com.midgard.render.MidgardFont.FONTS;
+			int cols = Math.max(2, Math.min(3, (cardW - 14) / 150));
+			for (int i = 0; i < fonts.size(); i += cols) {
+				out.add(fontGridRow(context, mouseX, mouseY, cardX, cardW, fonts, i, cols));
 			}
 		}
 		out.add(buttonRow(context, mouseX, mouseY, cardX, cardW, pngIcon("move"),
@@ -419,27 +422,35 @@ public class ConfigScreen extends Screen {
 		});
 	}
 
-	private Row fontOptionRow(DrawContext context, int mouseX, int mouseY, int cardX0, int cardW0,
-			com.midgard.render.MidgardFont.FontOption f) {
+	/** Eine Grid-Zeile mit {@code cols} Schriftarten nebeneinander (kompakt). */
+	private Row fontGridRow(DrawContext context, int mouseX, int mouseY, int cardX0, int cardW0,
+			List<com.midgard.render.MidgardFont.FontOption> fonts, int start, int cols) {
 		int indent = 14;
+		int gap = EVENT_GAP;
+		int cellH = 26;
 		int cardX = cardX0 + indent;
 		int cardW = cardW0 - indent;
-		return new Row(EVENT_H + EVENT_GAP, y -> {
-			boolean selected = f.key().equals(cfg.globalFontName);
-			boolean hover = hovering(mouseX, mouseY, cardX, y, cardW, EVENT_H);
-			float hoverT = animate("fopt" + f.key(), hover, 14f);
-			sprite(context, cardX, y, cardW, EVENT_H, lerpColor(CARD, CARD_HOVER, hoverT));
-			if (selected) {
-				sprite(context, cardX, y + 6, 3, EVENT_H - 12, ACCENT);
+		int cellW = (cardW - (cols - 1) * gap) / cols;
+		return new Row(cellH + EVENT_GAP, y -> {
+			for (int i = 0; i < cols && start + i < fonts.size(); i++) {
+				com.midgard.render.MidgardFont.FontOption f = fonts.get(start + i);
+				int x = cardX + i * (cellW + gap);
+				boolean selected = f.key().equals(cfg.globalFontName);
+				boolean hover = hovering(mouseX, mouseY, x, y, cellW, cellH);
+				float hoverT = animate("fopt" + f.key(), hover, 14f);
+				sprite(context, x, y, cellW, cellH, lerpColor(CARD, CARD_HOVER, hoverT));
+				if (selected) {
+					sprite(context, x, y + 5, 3, cellH - 10, ACCENT);
+				}
+				fontPreview(context, f.key(), f.display(), x + 10, y + (cellH - capH() - 2) / 2,
+						selected ? TEXT : TEXT_DIM);
+				clickables.add(new Clickable(x, y, x + cellW, y + cellH, () -> {
+					cfg.globalFontName = f.key();
+					cfg.save();
+					com.midgard.render.MidgardFont.apply(f.key()); // NUR hier wird neu geladen
+					fontExpanded = false;
+				}));
 			}
-			fontPreview(context, f.key(), f.display(), cardX + 12, y + (EVENT_H - capH() - 2) / 2,
-					selected ? TEXT : TEXT_DIM);
-			clickables.add(new Clickable(cardX, y, cardX + cardW, y + EVENT_H, () -> {
-				cfg.globalFontName = f.key();
-				cfg.save();
-				com.midgard.render.MidgardFont.apply(f.key()); // NUR hier wird neu geladen
-				fontExpanded = false;
-			}));
 		});
 	}
 

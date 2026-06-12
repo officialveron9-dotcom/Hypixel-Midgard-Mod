@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12c (Backend-only, Tooltip-Trennlinie, AH untereinander, Tooltip-Scroll)");
+		System.out.println("[Midgard] init build=2026-06-12d (Schriftarten-Grid kompakt)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
