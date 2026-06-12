@@ -25,6 +25,12 @@ public final class GardenHud {
 	public static final String KEY_TOOL = "GARDEN_TOOL";
 	public static final String KEY_STATS = "GARDEN_STATS";
 	public static final String KEY_COLLECTION = "GARDEN_COLLECTION";
+	public static final String KEY_COMPOSTER = "GARDEN_COMPOSTER";
+	public static final String KEY_JACOB = "GARDEN_JACOB";
+
+	/** Medaillen-Stufen beim Jacob-Contest (Top-Prozent). */
+	private static final int[] BRACKET_PCT = { 2, 5, 10, 30, 60 };
+	private static final String[] BRACKET_NAME = { "Diamant", "Platin", "Gold", "Silber", "Bronze" };
 
 	private static final int WHITE = 0xFFF1F1F4;
 	private static final int GREEN = 0xFF5BE36B;
@@ -51,10 +57,14 @@ public final class GardenHud {
 			if (preview && vis.isEmpty()) {
 				vis = List.of("Jacob", "Anita", "Spaceman");
 			}
-			if (!vis.isEmpty()) {
+			String next = preview && g.nextVisitor.isEmpty() ? "4m 30s" : g.nextVisitor;
+			if (!vis.isEmpty() || !next.isEmpty()) {
 				List<HudRow> rows = new ArrayList<>();
 				for (String v : vis) {
 					rows.add(new HudRow(List.of(Items.EMERALD), v, WHITE, false));
+				}
+				if (!next.isEmpty()) {
+					rows.add(new HudRow(List.of(), "Nächster: " + next, YELLOW, false));
 				}
 				out.add(new HudGroup(KEY_VISITORS, "Besucher", rows));
 			}
@@ -139,7 +149,79 @@ public final class GardenHud {
 			}
 		}
 
+		// 6) Composter: Material/Brennstoff/Restzeit, Warnung wenn leer.
+		if (cfg.gardenComposter) {
+			String matter = preview && g.composterMatter.isEmpty() ? "43,2k" : g.composterMatter;
+			String fuel = preview && g.composterFuel.isEmpty() ? "0" : g.composterFuel;
+			String time = preview && g.composterTime.isEmpty() ? "1h 4m" : g.composterTime;
+			if (!matter.isEmpty() || !fuel.isEmpty()) {
+				List<HudRow> rows = new ArrayList<>();
+				if (!matter.isEmpty()) {
+					rows.add(new HudRow(List.of(), "Material: " + matter,
+							empty(matter) ? RED : WHITE, empty(matter)));
+				}
+				if (!fuel.isEmpty()) {
+					rows.add(new HudRow(List.of(), "Brennstoff: " + fuel,
+							empty(fuel) ? RED : WHITE, empty(fuel)));
+				}
+				if (!time.isEmpty()) {
+					rows.add(new HudRow(List.of(), "Fertig in: " + time, GREEN, false));
+				}
+				out.add(new HudGroup(KEY_COMPOSTER, "Composter", rows));
+			}
+		}
+
+		// 7) Jacob-Contest live: gesammelt, Platzierung, nächste Medaille, Ende.
+		if (cfg.gardenJacob) {
+			long collected = g.jacobCollected;
+			int pct = g.jacobPercent;
+			if (preview && collected < 0) {
+				collected = 12_340;
+				pct = 7;
+			}
+			if (collected >= 0 || pct >= 0) {
+				List<HudRow> rows = new ArrayList<>();
+				if (collected >= 0) {
+					rows.add(new HudRow(List.of(), "Gesammelt: " + num(collected), WHITE, false));
+				}
+				int bracket = bracketOf(pct);
+				if (pct >= 0) {
+					rows.add(new HudRow(List.of(), "Top " + pct + "%  (" + BRACKET_NAME[bracket] + ")",
+							GREEN, false));
+					if (bracket > 0) {
+						rows.add(new HudRow(List.of(),
+								"Nächste: Top " + BRACKET_PCT[bracket - 1] + "% (" + BRACKET_NAME[bracket - 1] + ")",
+								YELLOW, false));
+					}
+				}
+				java.util.Map.Entry<Long, java.util.List<String>> act =
+						com.midgard.price.PriceApi.INSTANCE.jacobActive(System.currentTimeMillis() / 1000);
+				if (act != null) {
+					long ends = act.getKey() + com.midgard.price.PriceApi.CONTEST_SECONDS
+							- System.currentTimeMillis() / 1000;
+					rows.add(new HudRow(List.of(), "Endet in " + TimeUtil.format(ends), YELLOW, false));
+				} else if (preview) {
+					rows.add(new HudRow(List.of(), "Endet in 12m 20s", YELLOW, false));
+				}
+				out.add(new HudGroup(KEY_JACOB, "Jacob Live", rows));
+			}
+		}
+
 		return out;
+	}
+
+	/** Stufe (Index in BRACKET_*) zu einer Top-Prozent-Platzierung. */
+	private static int bracketOf(int pct) {
+		for (int i = 0; i < BRACKET_PCT.length; i++) {
+			if (pct >= 0 && pct <= BRACKET_PCT[i]) {
+				return i;
+			}
+		}
+		return BRACKET_PCT.length - 1;
+	}
+
+	private static boolean empty(String v) {
+		return v.startsWith("0") || v.toLowerCase(java.util.Locale.ROOT).contains("empty");
 	}
 
 	/** Kompakte Zahl: 1,2B / 3,4M / 12,3k / 123. */

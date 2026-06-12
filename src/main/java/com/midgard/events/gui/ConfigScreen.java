@@ -299,36 +299,57 @@ public class ConfigScreen extends Screen {
 	}
 
 	private void buildGardenRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
-		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("zoo"),
-				"Besucher", "Alle wartenden Visitors im HUD auflisten.",
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Besucher",
 				() -> cfg.gardenVisitors, () -> {
 					cfg.gardenVisitors = !cfg.gardenVisitors;
 					cfg.save();
 				}));
-		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("spooky"),
-				"Schädlinge", "Anzahl (x/8) + befallene Plots; eigener Plot leuchtet.",
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Schädlinge",
 				() -> cfg.gardenPests, () -> {
 					cfg.gardenPests = !cfg.gardenPests;
 					cfg.save();
 				}));
-		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("wheat"),
-				"Collection-Rang", "Fortschritt + Zeit bis zum nächsten Collection-Rang.",
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Milestone-Rang",
 				() -> cfg.gardenCollection, () -> {
 					cfg.gardenCollection = !cfg.gardenCollection;
 					cfg.save();
 				}));
-		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("size"),
-				"Werkzeug-Level", "Cultivating-Level + Fortschritt des Farm-Werkzeugs.",
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Werkzeug-Level",
 				() -> cfg.gardenTool, () -> {
 					cfg.gardenTool = !cfg.gardenTool;
 					cfg.save();
 				}));
-		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("election"),
-				"Farming-Statistik", "Beim Farmen: Crops/min und Blöcke/s live.",
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Farming-Statistik",
 				() -> cfg.gardenStats, () -> {
 					cfg.gardenStats = !cfg.gardenStats;
 					cfg.save();
 				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Composter",
+				() -> cfg.gardenComposter, () -> {
+					cfg.gardenComposter = !cfg.gardenComposter;
+					cfg.save();
+				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Jacob Live",
+				() -> cfg.gardenJacob, () -> {
+					cfg.gardenJacob = !cfg.gardenJacob;
+					cfg.save();
+				}));
+	}
+
+	/** Kompakte Schalter-Zeile ohne Icon (Garden-Tab). */
+	private Row compactToggleRow(DrawContext context, int mouseX, int mouseY, int cardX, int cardW,
+			String title, java.util.function.BooleanSupplier value, Runnable onClick) {
+		return new Row(EVENT_H + EVENT_GAP, y -> {
+			boolean hover = hovering(mouseX, mouseY, cardX, y, cardW, EVENT_H);
+			float hoverT = animate("gd" + title, hover, 14f);
+			float togT = animate("gdt" + title, value.getAsBoolean(), 12f);
+			sprite(context, cardX, y, cardW, EVENT_H, lerpColor(CARD, CARD_HOVER, hoverT));
+			txtVC(context, title, cardX + 12, y, EVENT_H, value.getAsBoolean() ? TEXT : TEXT_DIM, true);
+			int togW = 26;
+			int togH = 13;
+			drawToggle(context, cardX + cardW - 10 - togW, y + (EVENT_H - togH) / 2, togT, togW, togH);
+			clickables.add(new Clickable(cardX, y, cardX + cardW, y + EVENT_H, onClick));
+		});
 	}
 
 	private void buildEventRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {

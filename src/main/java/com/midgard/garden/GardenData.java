@@ -31,12 +31,25 @@ public class GardenData {
 	private static final Pattern PEST_COUNT = Pattern.compile("(?:Pests?|Schädlinge)[:\\s]+(\\d+)");
 	private static final Pattern PLOT_LINE = Pattern.compile("Plot\\s*[-–]\\s*(.+)");
 	private static final Pattern PLOT_NUMBERS = Pattern.compile("(\\d+)");
+	private static final Pattern NEXT_VISITOR = Pattern.compile("Next Visitor:\\s*(.+)");
+	private static final Pattern ORGANIC = Pattern.compile("Organic Matter:\\s*(.+)");
+	private static final Pattern FUEL = Pattern.compile("Fuel:\\s*(.+)");
+	private static final Pattern TIME_LEFT = Pattern.compile("Time Left:\\s*(.+)");
+	private static final Pattern COLLECTED = Pattern.compile("Collected:?\\s*([\\d.,]+)");
+	private static final Pattern TOP_PCT = Pattern.compile("(?i)Top\\s*(\\d+)%");
 
 	public volatile boolean onGarden = false;
 	public volatile String currentPlot = "";
 	public volatile int pestCount = 0;
 	public volatile List<String> infestedPlots = List.of();
 	public volatile List<String> visitors = List.of();
+	public volatile String nextVisitor = "";
+	public volatile String composterMatter = "";
+	public volatile String composterFuel = "";
+	public volatile String composterTime = "";
+	/** Jacob-Contest live (aus dem Scoreboard): gesammelt + Top-Prozent, -1 = kein Contest. */
+	public volatile long jacobCollected = -1;
+	public volatile int jacobPercent = -1;
 
 	private long lastDiagMs = 0;
 
@@ -91,14 +104,25 @@ public class GardenData {
 		List<String> vis = new ArrayList<>();
 		Set<String> plots = new LinkedHashSet<>();
 		int pests = -1;
+		String nextVis = "";
+		String matter = "";
+		String fuel = "";
+		String compTime = "";
 
 		boolean inVisitors = false;
+		boolean inComposter = false;
 		for (String raw : tab) {
 			String line = raw == null ? "" : raw.trim();
 			String lower = line.toLowerCase(Locale.ROOT);
 
 			if (lower.startsWith("visitors") || lower.startsWith("besucher")) {
 				inVisitors = true;
+				inComposter = false;
+				continue;
+			}
+			if (lower.startsWith("composter")) {
+				inComposter = true;
+				inVisitors = false;
 				continue;
 			}
 			if (inVisitors) {
@@ -109,6 +133,32 @@ public class GardenData {
 				} else if (vis.size() < 8) {
 					vis.add(line);
 					continue;
+				}
+			}
+
+			Matcher m = NEXT_VISITOR.matcher(line);
+			if (m.find()) {
+				nextVis = m.group(1).trim();
+				continue;
+			}
+			m = ORGANIC.matcher(line);
+			if (m.find()) {
+				matter = m.group(1).trim();
+				continue;
+			}
+			m = FUEL.matcher(line);
+			if (m.find()) {
+				fuel = m.group(1).trim();
+				continue;
+			}
+			if (inComposter) {
+				m = TIME_LEFT.matcher(line);
+				if (m.find()) {
+					compTime = m.group(1).trim();
+					continue;
+				}
+				if (line.isEmpty()) {
+					inComposter = false;
 				}
 			}
 
@@ -128,7 +178,9 @@ public class GardenData {
 			}
 		}
 
-		// Fallback: manche Infos stehen (auch) im Scoreboard.
+		// Scoreboard: Pest-Fallback + Jacob-Contest live (Collected / Top x%).
+		long collected = -1;
+		int pct = -1;
 		for (String line : sidebar) {
 			Matcher pm = PEST_COUNT.matcher(line);
 			if (pm.find() && pests < 0) {
@@ -137,9 +189,29 @@ public class GardenData {
 				} catch (NumberFormatException ignored) {
 				}
 			}
+			Matcher cm = COLLECTED.matcher(line);
+			if (cm.find()) {
+				try {
+					collected = Long.parseLong(cm.group(1).replace(",", "").replace(".", ""));
+				} catch (NumberFormatException ignored) {
+				}
+			}
+			Matcher tm = TOP_PCT.matcher(line);
+			if (tm.find()) {
+				try {
+					pct = Integer.parseInt(tm.group(1));
+				} catch (NumberFormatException ignored) {
+				}
+			}
 		}
+		jacobCollected = collected;
+		jacobPercent = pct;
 
 		visitors = vis;
+		nextVisitor = nextVis;
+		composterMatter = matter;
+		composterFuel = fuel;
+		composterTime = compTime;
 		infestedPlots = new ArrayList<>(plots);
 		pestCount = Math.max(0, pests);
 

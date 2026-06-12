@@ -37,8 +37,8 @@ public class EventHud {
 	public static final EventHud INSTANCE = new EventHud();
 
 	private static final float HUD_FONT = 9f;
-	private static final int PAD = 6;
-	private static final int GROUP_GAP = 5;
+	private static final int PAD = 4;
+	private static final int GROUP_GAP = 4;
 
 	private static final int COLOR_HEADER = 0xFF57D8FF;
 	private static final int COLOR_ACTIVE = 0xFF5BE36B;
@@ -141,7 +141,7 @@ public class EventHud {
 
 	private int rowH(ModConfig cfg, HudRow row) {
 		int iconH = row.icons().isEmpty() ? 0 : iconSize(cfg);
-		return Math.max(iconH, capH(false) + sp(4));
+		return Math.max(iconH, capH(false) + sp(3));
 	}
 
 	private int textW(String s, float size, boolean bold) {
@@ -204,7 +204,7 @@ public class EventHud {
 			rowsH += rowH(cfg, row);
 		}
 		int frameW = Math.max(rowsW, titleW) + pad * 2;
-		int groupH = pad + titleH + sp(3) + rowsH + pad;
+		int groupH = pad + titleH + sp(2) + rowsH + pad;
 		return new int[] { frameW, titleH, groupH };
 	}
 
@@ -249,14 +249,14 @@ public class EventHud {
 
 		boolean bg = cfg.showBackground || preview;
 		if (bg) {
-			int r = Math.min(Math.max(4, sp(7)), Math.min(groupH, frameW) / 2);
+			int r = Math.min(Math.max(3, sp(5)), Math.min(groupH, frameW) / 2);
 			UIRenderer.fillRoundedRect(context, ox - 1, oy - 1, frameW + 2, groupH + 2, r + 1, BORDER);
 			UIRenderer.fillRoundedRect(context, ox, oy, frameW, groupH, r, BG);
 		}
 
 		outlined(context, g.title(), ox + pad, oy + pad, fs, COLOR_HEADER, true);
 
-		int y = oy + pad + titleH + sp(3);
+		int y = oy + pad + titleH + sp(2);
 		for (HudRow row : g.rows()) {
 			drawRow(context, cfg, row, ox + pad, y, fs, frameW - pad * 2);
 			y += rowH(cfg, row);

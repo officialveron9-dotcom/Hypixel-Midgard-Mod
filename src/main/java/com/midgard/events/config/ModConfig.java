@@ -43,6 +43,10 @@ public class ModConfig {
 	public boolean gardenTool = true;
 	/** Farming-Statistik (Crops/min, Blöcke/s ...). */
 	public boolean gardenStats = true;
+	/** Composter-Status (Material/Brennstoff/Restzeit). */
+	public boolean gardenComposter = true;
+	/** Jacob-Contest live: Score, Platzierung, nächste Medaille, Endzeit. */
+	public boolean gardenJacob = true;
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 

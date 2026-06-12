@@ -286,7 +286,14 @@ public class HudPositionScreen extends Screen {
 				ny = this.height - r.h() - EDGE_MARGIN;
 			}
 
-			cfg.setGroupPos(selected, nx, ny);
+			// Kein Überlappen: erst volle Bewegung versuchen, sonst nur eine Achse.
+			if (!collides(nx, ny, r)) {
+				cfg.setGroupPos(selected, nx, ny);
+			} else if (!collides(nx, r.y(), r)) {
+				cfg.setGroupPos(selected, nx, r.y());
+			} else if (!collides(r.x(), ny, r)) {
+				cfg.setGroupPos(selected, r.x(), ny);
+			}
 			return true;
 		}
 		return super.mouseDragged(click, offsetX, offsetY);
@@ -312,6 +319,22 @@ public class HudPositionScreen extends Screen {
 
 	private static int clamp(int v, int min, int max) {
 		return Math.max(min, Math.min(max, v));
+	}
+
+	/** Würde das ausgewählte Element an (nx, ny) ein anderes überlappen? */
+	private boolean collides(int nx, int ny, GroupRect self) {
+		int gap = 2; // Mindestabstand zwischen Elementen
+		for (GroupRect o : layout()) {
+			if (o.key().equals(selected)) {
+				continue;
+			}
+			boolean apart = nx + self.w() + gap <= o.x() || o.x() + o.w() + gap <= nx
+					|| ny + self.h() + gap <= o.y() || o.y() + o.h() + gap <= ny;
+			if (!apart) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
