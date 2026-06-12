@@ -97,6 +97,10 @@ public class ConfigScreen extends Screen {
 	private final Map<String, Float> anim = new HashMap<>();
 	private final java.util.Set<EventCategory> expanded = new java.util.HashSet<>();
 	private boolean fontExpanded = false;
+	/** Hover-Vorschau (gesetzt von toggleRow, gezeichnet ganz am Ende des Frames). */
+	private List<String> preview;
+	private int previewMX;
+	private int previewMY;
 	private final Map<String, com.midgard.render.GlyphAtlas> fontPrev = new HashMap<>();
 
 	private long lastNanos = 0;
@@ -141,9 +145,11 @@ public class ConfigScreen extends Screen {
 		sprite(context, px, py, pw, ph, PANEL);
 		context.fill(px + SIDEBAR_W, py + 12, px + SIDEBAR_W + 1, py + ph - 12, DIVIDER);
 
+		preview = null;
 		drawSidebar(context, mouseX, mouseY);
 		drawHeader(context, mouseX, mouseY);
 		drawContent(context, mouseX, mouseY);
+		drawPreview(context);
 	}
 
 	// ---- Sidebar ----------------------------------------------------------
@@ -349,13 +355,24 @@ public class ConfigScreen extends Screen {
 				() -> cfg.showPrices, () -> {
 					cfg.showPrices = !cfg.showPrices;
 					cfg.save();
-				}));
+				},
+				() -> List.of(
+						"Vorschau: Tooltip",
+						"Bazaar Kauf: " + com.midgard.util.Numbers.coins(4.4),
+						"Bazaar Verkauf: " + com.midgard.util.Numbers.coins(3.1),
+						"AH Lowest BIN: " + com.midgard.util.Numbers.format(488_000_000L),
+						"AH Durchschnitt: " + com.midgard.util.Numbers.format(1_278_916_426L))));
 		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("election"),
-				"Zahlen kürzen", "500.000.000 → 500kk. Aus = immer volle Zahl (überall).",
+				"Zahlen kürzen", "Kurzform wie 500kk statt voller Zahl. Gilt überall.",
 				() -> cfg.compactNumbers, () -> {
 					cfg.compactNumbers = !cfg.compactNumbers;
 					cfg.save();
-				}));
+				},
+				() -> List.of(
+						"Vorschau: Zahlen",
+						"An:  500kk  -  12,3k  -  1,2B",
+						"Aus: 500.000.000  -  12.300",
+						"Aktuell: " + com.midgard.util.Numbers.format(500_000_000L))));
 	}
 
 	private void buildMiningRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
@@ -572,6 +589,13 @@ public class ConfigScreen extends Screen {
 
 	private Row toggleRow(DrawContext context, int mouseX, int mouseY, int cardX, int cardW,
 			String icon, String title, String desc, java.util.function.BooleanSupplier value, Runnable onClick) {
+		return toggleRow(context, mouseX, mouseY, cardX, cardW, icon, title, desc, value, onClick, null);
+	}
+
+	/** Toggle-Karte; {@code previewLines} (optional) wird beim Hovern als Vorschau-Fenster gezeigt. */
+	private Row toggleRow(DrawContext context, int mouseX, int mouseY, int cardX, int cardW,
+			String icon, String title, String desc, java.util.function.BooleanSupplier value, Runnable onClick,
+			java.util.function.Supplier<List<String>> previewLines) {
 		return new Row(CARD_H + CARD_GAP, y -> {
 			boolean hover = hovering(mouseX, mouseY, cardX, y, cardW, CARD_H);
 			float hoverT = animate("g" + title, hover, 14f);
@@ -581,7 +605,37 @@ public class ConfigScreen extends Screen {
 			textBlock(context, cardX, y, cardW, CARD_H, TILE_SIZE, title, desc);
 			drawToggle(context, cardX + cardW - 14 - 28, y + (CARD_H - 14) / 2, togT, 28, 14);
 			clickables.add(new Clickable(cardX, y, cardX + cardW, y + CARD_H, onClick));
+			if (hover && previewLines != null) {
+				preview = previewLines.get();
+				previewMX = mouseX;
+				previewMY = mouseY;
+			}
 		});
+	}
+
+	/** Schwebendes Vorschau-Fenster neben der Maus (über allem gezeichnet). */
+	private void drawPreview(DrawContext c) {
+		if (preview == null || preview.isEmpty()) {
+			return;
+		}
+		int pad = 10;
+		int lineH = 14;
+		int w = 0;
+		for (int i = 0; i < preview.size(); i++) {
+			w = Math.max(w, txtW(preview.get(i), i == 0));
+		}
+		w += pad * 2;
+		int h = pad * 2 + preview.size() * lineH - 4;
+		int x = previewMX + 14;
+		int y = Math.max(4, Math.min(previewMY + 6, this.height - h - 4));
+		if (x + w > this.width - 4) {
+			x = previewMX - w - 14;
+		}
+		sprite(c, x - 1, y - 1, w + 2, h + 2, 0x66FFFFFF);
+		sprite(c, x, y, w, h, 0xF8101015);
+		for (int i = 0; i < preview.size(); i++) {
+			txt(c, preview.get(i), x + pad, y + pad + i * lineH, i == 0 ? ACCENT : TEXT, i == 0);
+		}
 	}
 
 	private Row buttonRow(DrawContext context, int mouseX, int mouseY, int cardX, int cardW,

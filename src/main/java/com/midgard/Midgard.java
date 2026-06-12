@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12o (Auktion-Tab: Preis-Toggle + Zahlen kuerzen, Standard voll)");
+		System.out.println("[Midgard] init build=2026-06-12p (Hover-Vorschau im Auktion-Tab, Text ohne Sonderzeichen)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
