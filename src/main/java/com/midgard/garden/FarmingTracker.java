@@ -49,9 +49,12 @@ public class FarmingTracker {
 	}
 
 	private final ArrayDeque<Sample> samples = new ArrayDeque<>();
+	private final ArrayDeque<Long> blockBreaks = new ArrayDeque<>();
 	private final Map<String, Collection> collections = new HashMap<>();
 
 	public volatile String toolCrop = "";
+	/** Crop, erkannt am zuletzt abgebauten Block (unabhängig vom Werkzeug). */
+	public volatile String blockCrop = "";
 	public volatile long counter = -1;
 	public volatile long cultivating = -1;
 	private int lastScreenHash = 0;
@@ -115,6 +118,73 @@ public class FarmingTracker {
 		if (u.contains("WART")) {
 			return "Nether Wart";
 		}
+		if (u.contains("FUNGI")) {
+			return "Mushroom";
+		}
+		return "";
+	}
+
+	/** Effektives Crop: Werkzeug-ID, sonst der zuletzt abgebaute Block. */
+	public String crop() {
+		return toolCrop.isEmpty() ? blockCrop : toolCrop;
+	}
+
+	/**
+	 * Vom Block-Break-Event (Fabric) gemeldet: zählt echte abgebaute Blöcke
+	 * (für Blöcke/s) und erkennt das Crop am Block selbst – funktioniert damit
+	 * auch mit den einfachen SkyMart-Werkzeugen ohne Crop in der Item-ID.
+	 */
+	public void onBlockBroken(net.minecraft.block.BlockState state) {
+		String crop = cropFromBlock(state);
+		if (crop.isEmpty()) {
+			return;
+		}
+		blockCrop = crop;
+		long now = System.currentTimeMillis();
+		blockBreaks.addLast(now);
+		while (!blockBreaks.isEmpty() && now - blockBreaks.peekFirst() > 30_000) {
+			blockBreaks.removeFirst();
+		}
+	}
+
+	private static String cropFromBlock(net.minecraft.block.BlockState state) {
+		if (state == null) {
+			return "";
+		}
+		net.minecraft.block.Block b = state.getBlock();
+		if (b == net.minecraft.block.Blocks.WHEAT) {
+			return "Wheat";
+		}
+		if (b == net.minecraft.block.Blocks.CARROTS) {
+			return "Carrot";
+		}
+		if (b == net.minecraft.block.Blocks.POTATOES) {
+			return "Potato";
+		}
+		if (b == net.minecraft.block.Blocks.NETHER_WART) {
+			return "Nether Wart";
+		}
+		if (b == net.minecraft.block.Blocks.PUMPKIN) {
+			return "Pumpkin";
+		}
+		if (b == net.minecraft.block.Blocks.MELON) {
+			return "Melon";
+		}
+		if (b == net.minecraft.block.Blocks.SUGAR_CANE) {
+			return "Sugar Cane";
+		}
+		if (b == net.minecraft.block.Blocks.CACTUS) {
+			return "Cactus";
+		}
+		if (b == net.minecraft.block.Blocks.COCOA) {
+			return "Cocoa Beans";
+		}
+		if (b == net.minecraft.block.Blocks.RED_MUSHROOM || b == net.minecraft.block.Blocks.BROWN_MUSHROOM
+				|| b == net.minecraft.block.Blocks.RED_MUSHROOM_BLOCK
+				|| b == net.minecraft.block.Blocks.BROWN_MUSHROOM_BLOCK
+				|| b == net.minecraft.block.Blocks.MUSHROOM_STEM) {
+			return "Mushroom";
+		}
 		return "";
 	}
 
@@ -143,16 +213,27 @@ public class FarmingTracker {
 		return rate(60_000, 60_000);
 	}
 
+	/** Echte abgebaute Crop-Blöcke pro Sekunde (5-s-Fenster, vom Break-Event). */
 	public double blocksPerSecond() {
-		return rate(5_000, 1_000);
+		long now = System.currentTimeMillis();
+		int n = 0;
+		for (long t : blockBreaks) {
+			if (now - t <= 5_000) {
+				n++;
+			}
+		}
+		return n / 5.0;
 	}
 
-	/** Wird gerade aktiv gefarmt (Zähler in den letzten 4 s gestiegen)? */
+	/** Wird gerade aktiv gefarmt (Zähler gestiegen oder Block abgebaut, 4 s)? */
 	public boolean farming() {
+		long now = System.currentTimeMillis();
+		if (!blockBreaks.isEmpty() && now - blockBreaks.peekLast() <= 4_000) {
+			return true;
+		}
 		if (samples.size() < 2) {
 			return false;
 		}
-		long now = System.currentTimeMillis();
 		long last = samples.peekLast().counter;
 		for (Sample s : samples) {
 			if (now - s.timeMs <= 4_000) {
@@ -182,9 +263,10 @@ public class FarmingTracker {
 		return lvl >= CULTIVATING.length ? -1 : CULTIVATING[lvl];
 	}
 
-	/** Collection-Stand des aktuellen Werkzeug-Crops (live hochgerechnet) oder null. */
+	/** Collection-/Milestone-Stand des aktuellen Crops (live hochgerechnet) oder null. */
 	public Collection collection() {
-		return toolCrop.isEmpty() ? null : collections.get(toolCrop);
+		String crop = crop();
+		return crop.isEmpty() ? null : collections.get(crop);
 	}
 
 	/** Geschätzter aktueller Collection-Betrag (Menü-Stand + seither gefarmt). */
@@ -212,7 +294,9 @@ public class FarmingTracker {
 			return;
 		}
 		String title = s.getTitle() == null ? "" : s.getTitle().getString();
-		if (!title.toLowerCase(Locale.ROOT).contains("collection")) {
+		String tl = title.toLowerCase(Locale.ROOT);
+		// Im Garden heißt das Menü "Crop Milestones" (Desk), sonst "… Collection".
+		if (!tl.contains("collection") && !tl.contains("milestone")) {
 			return;
 		}
 		if (s.hashCode() == lastScreenHash) {

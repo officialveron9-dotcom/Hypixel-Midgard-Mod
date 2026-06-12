@@ -73,8 +73,16 @@ public class GardenData {
 
 	/** Tab-Liste: Besucher-Abschnitt + Schädlings-Widget. */
 	private void parseTab(MinecraftClient mc, List<String> sidebar) {
+		// WICHTIG: wie Vanilla sortieren (listOrder, Team, Name) – die Collection
+		// aus dem NetworkHandler ist unsortiert, Abschnitte wären sonst zerwürfelt.
+		List<PlayerListEntry> entries = new ArrayList<>(mc.getNetworkHandler().getListedPlayerListEntries());
+		entries.sort(java.util.Comparator
+				.<PlayerListEntry>comparingInt(e -> -e.getListOrder())
+				.thenComparing(e -> e.getScoreboardTeam() == null ? "" : e.getScoreboardTeam().getName())
+				.thenComparing(e -> e.getProfile() == null ? "" : e.getProfile().name(),
+						String.CASE_INSENSITIVE_ORDER));
 		List<String> tab = new ArrayList<>();
-		for (PlayerListEntry e : mc.getNetworkHandler().getListedPlayerListEntries()) {
+		for (PlayerListEntry e : entries) {
 			if (e.getDisplayName() != null) {
 				tab.add(ScoreboardReader.stripFormatting(e.getDisplayName().getString()));
 			}
@@ -94,8 +102,9 @@ public class GardenData {
 				continue;
 			}
 			if (inVisitors) {
-				// Abschnitt endet bei Leerzeile oder nächster Überschrift (endet mit ':').
-				if (line.isEmpty() || line.endsWith(":")) {
+				// Abschnitt endet bei Leerzeile oder der nächsten Widget-Zeile
+				// (Überschriften/Infos enthalten ':', Besuchernamen nicht).
+				if (line.isEmpty() || line.contains(":")) {
 					inVisitors = false;
 				} else if (vis.size() < 8) {
 					vis.add(line);
@@ -134,19 +143,22 @@ public class GardenData {
 		infestedPlots = new ArrayList<>(plots);
 		pestCount = Math.max(0, pests);
 
-		// Diagnose: alle 15 s die garden-relevanten Tab-Zeilen loggen.
+		// Diagnose: alle 15 s die KOMPLETTE Tab-Liste loggen (Garden ist eine
+		// Privatinsel, das bleibt überschaubar) – zum Nachschärfen der Parser.
 		long now = System.currentTimeMillis();
 		if (now - lastDiagMs > 15_000) {
 			lastDiagMs = now;
 			StringBuilder sb = new StringBuilder();
+			int n = 0;
 			for (String t : tab) {
-				String lt = t.toLowerCase(Locale.ROOT);
-				if (lt.contains("visitor") || lt.contains("besuch") || lt.contains("pest")
-						|| lt.contains("plot") || lt.contains("garden") || lt.contains("ൠ")) {
-					sb.append(" | ").append(t);
+				if (n++ >= 60) {
+					sb.append(" | ...");
+					break;
 				}
+				sb.append(" | ").append(t);
 			}
-			System.out.println("[Midgard] Garden-Tab:" + sb + " || plot=" + currentPlot
+			System.out.println("[Midgard] Garden-Tab:" + sb);
+			System.out.println("[Midgard] Garden-Parsed: plot=" + currentPlot
 					+ " pests=" + pestCount + "/" + MAX_PESTS + " infested=" + infestedPlots
 					+ " visitors=" + visitors);
 		}

@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12g (Garden: Besucher, Schaedlinge, Collection, Werkzeug, Farm-Statistik)");
+		System.out.println("[Midgard] init build=2026-06-12h (Garden-Fixes: Tab sortiert, Milestone-Menue, echte Bloecke/s, Crop am Block)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -61,6 +61,10 @@ public class Midgard implements ClientModInitializer {
 				InputUtil.Type.KEYSYM,
 				GLFW.GLFW_KEY_UNKNOWN, // standardmäßig nicht belegt
 				category));
+
+		// Abgebaute Blöcke an den Farming-Tracker melden (Blöcke/s + Crop-Erkennung).
+		net.fabricmc.fabric.api.event.client.player.ClientPlayerBlockBreakEvents.AFTER.register(
+				(world, player, pos, state) -> com.midgard.garden.FarmingTracker.INSTANCE.onBlockBroken(state));
 
 		// Chat-Nachrichten an den Live-Event-Tracker weitergeben (nur lesen, nie senden).
 		ClientReceiveMessageEvents.GAME.register((message, overlay) -> {

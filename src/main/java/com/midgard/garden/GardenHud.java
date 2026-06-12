@@ -101,7 +101,7 @@ public final class GardenHud {
 
 		// 4) Farming-Statistik: nur während aktiv gefarmt wird.
 		if (cfg.gardenStats && (preview || f.farming())) {
-			String crop = f.toolCrop.isEmpty() ? (preview ? "Wheat" : "Farming") : f.toolCrop;
+			String crop = f.crop().isEmpty() ? (preview ? "Wheat" : "Farming") : f.crop();
 			Item icon = EventIcons.forCrop(crop);
 			List<HudRow> rows = new ArrayList<>();
 			double cpm = f.cropsPerMinute();
@@ -132,7 +132,7 @@ public final class GardenHud {
 				rows.add(new HudRow(List.of(Items.WHEAT), "84,3k / 100k", WHITE, false));
 				rows.add(new HudRow(List.of(), "Rang in 1h 12m", GREEN, false));
 			} else if (f.farming()) {
-				rows.add(new HudRow(List.of(), "Collection-Menü 1x öffnen", YELLOW, false));
+				rows.add(new HudRow(List.of(), "Milestone-Menü 1x öffnen", YELLOW, false));
 			}
 			if (!rows.isEmpty()) {
 				out.add(new HudGroup(KEY_COLLECTION, "Collection", rows));
