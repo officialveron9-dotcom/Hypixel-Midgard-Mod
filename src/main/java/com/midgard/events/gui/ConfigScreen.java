@@ -88,6 +88,7 @@ public class ConfigScreen extends Screen {
 	private final ModConfig cfg = Midgard.config;
 	private final List<Tab> tabs = List.of(
 			new Tab("Allgemein", false, 0xFFFFFFFF),
+			new Tab("Interface", false, 0xFF57D8FF),
 			new Tab("Events", true, ACCENT),
 			new Tab("Garden", false, 0xFF5BE36B));
 	private final List<Clickable> clickables = new ArrayList<>();
@@ -209,6 +210,8 @@ public class ConfigScreen extends Screen {
 			buildEventRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else if (tab.label().equals("Garden")) {
 			buildGardenRows(rows, context, mouseX, mouseY, cardX, cardW);
+		} else if (tab.label().equals("Interface")) {
+			buildInterfaceRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else {
 			buildGeneralRows(rows, context, mouseX, mouseY, cardX, cardW);
 		}
@@ -273,12 +276,21 @@ public class ConfigScreen extends Screen {
 				out.add(fontGridRow(context, mouseX, mouseY, cardX, cardW, fonts, i, cols));
 			}
 		}
+	}
+
+	private void buildInterfaceRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
 		out.add(buttonRow(context, mouseX, mouseY, cardX, cardW, pngIcon("move"),
-				"HUD bearbeiten", "Position, Größe, Icons & Presets.", "Öffnen",
+				"HUD bearbeiten", "Elemente auswählen, verschieben und skalieren.", "Öffnen",
 				() -> {
 					if (client != null) {
 						client.setScreen(new HudPositionScreen(this));
 					}
+				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("hud"),
+				"Eigene Statusleisten", "Leben links, XP mittig, Mana rechts – Werte in der Leiste.",
+				() -> cfg.customBars, () -> {
+					cfg.customBars = !cfg.customBars;
+					cfg.save();
 				}));
 	}
 

@@ -31,6 +31,8 @@ public class ModConfig {
 	public String globalFontName = "";
 	/** Bazaar-Preise im Item-Tooltip anzeigen. */
 	public boolean showPrices = true;
+	/** Eigene Statusleisten: Leben links, XP mittig, Mana rechts (Text innen). */
+	public boolean customBars = true;
 
 	// --- Garden (alles einzeln schaltbar) -----------------------------------
 	/** Besucherliste im HUD. */

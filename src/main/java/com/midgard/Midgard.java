@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12k (Farming-Box kombiniert, Abgabe-Timer, ohne elitebot-Link)");
+		System.out.println("[Midgard] init build=2026-06-12l (Interface-Tab, eigene Statusleisten: Leben/XP/Mana)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -71,6 +71,9 @@ public class Midgard implements ClientModInitializer {
 			if (!overlay) {
 				LiveEventTracker.INSTANCE.onChat(message.getString());
 				com.midgard.garden.GardenData.INSTANCE.onChat(message.getString());
+			} else {
+				// Actionbar: Hypixel zeigt dort Leben/Mana (für die eigenen Leisten).
+				com.midgard.bars.StatusBars.onActionBar(message.getString());
 			}
 		});
 
@@ -99,6 +102,9 @@ public class Midgard implements ClientModInitializer {
 		});
 
 		// HUD zeichnen.
-		HudRenderCallback.EVENT.register((context, tickCounter) -> EventHud.INSTANCE.render(context));
+		HudRenderCallback.EVENT.register((context, tickCounter) -> {
+			EventHud.INSTANCE.render(context);
+			com.midgard.bars.StatusBars.render(context);
+		});
 	}
 }

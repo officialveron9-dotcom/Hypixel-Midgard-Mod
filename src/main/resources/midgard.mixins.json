@@ -5,7 +5,9 @@
 	"minVersion": "0.8",
 	"client": [
 		"DrawContextMixin",
-		"HandledScreenMixin"
+		"ExperienceBarMixin",
+		"HandledScreenMixin",
+		"InGameHudMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
