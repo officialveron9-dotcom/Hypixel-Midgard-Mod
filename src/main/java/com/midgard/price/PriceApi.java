@@ -18,26 +18,30 @@ import com.google.gson.JsonParser;
 import com.midgard.Midgard;
 
 /**
- * Lädt die aggregierte {@code prices.json} vom (selbst gehosteten) Backend:
- * Auktionshaus-Statistik (Min/Max/Ø/Lowest BIN pro Item) und den vollen
- * Jacob-Zeitplan. Wird nur genutzt, wenn eine URL gesetzt ist; schlägt der
- * Abruf fehl (Backend noch nicht online), bleibt alles leer und der Mod nutzt
- * weiter die direkten Bazaar-Preise + den In-Game-Jacob.
+ * Einzige Datenquelle des Mods für Preise + Jacob-Zeitplan: die aggregierte
+ * {@code prices.json} vom eigenen Backend (GitHub Pages). Die Clients reden
+ * NIE direkt mit Hypixel oder elitebot — nur das Backend tut das (1x zentral).
+ * Ist das Backend nicht erreichbar, meldet {@link #isOnline()} false und der
+ * Mod zeigt "Keine Backend-Verbindung" an.
  */
-public class PriceApi implements JacobSource {
+public class PriceApi {
 
 	public static final PriceApi INSTANCE = new PriceApi();
 	public static final long CONTEST_SECONDS = 20 * 60;
 
 	private static final long REFRESH_MS = 5 * 60_000L;
+	private static final long RETRY_MS = 60_000L; // schnellerer Neuversuch nach Fehler
+	private static final long ONLINE_GRACE_MS = 15 * 60_000L;
 
 	private final HttpClient client = HttpClient.newBuilder()
 			.connectTimeout(Duration.ofSeconds(10))
 			.build();
 
+	private volatile Map<String, double[]> bazaar = new HashMap<>(); // id -> {buy, sell}
 	private volatile Map<String, double[]> auctions = new HashMap<>(); // id -> {min, max, avg, lowestBin}
 	private volatile TreeMap<Long, List<String>> jacob = new TreeMap<>(); // startSec -> crops
-	private volatile long lastFetchMs = 0;
+	private volatile long lastAttemptMs = 0;
+	private volatile long lastSuccessMs = 0;
 	private volatile boolean fetching = false;
 	private volatile String lastUrl = "";
 
@@ -51,12 +55,12 @@ public class PriceApi implements JacobSource {
 		}
 		long now = System.currentTimeMillis();
 		boolean urlChanged = !url.equals(lastUrl);
-		boolean haveData = !auctions.isEmpty() || !jacob.isEmpty();
-		if (!urlChanged && haveData && now - lastFetchMs < REFRESH_MS) {
+		long wait = lastSuccessMs >= lastAttemptMs ? REFRESH_MS : RETRY_MS;
+		if (!urlChanged && now - lastAttemptMs < wait) {
 			return;
 		}
 		fetching = true;
-		lastFetchMs = now;
+		lastAttemptMs = now;
 		lastUrl = url;
 		final String u = url;
 		CompletableFuture.runAsync(() -> fetch(u));
@@ -71,10 +75,18 @@ public class PriceApi implements JacobSource {
 					.build();
 			HttpResponse<String> r = client.send(req, HttpResponse.BodyHandlers.ofString());
 			if (r.statusCode() != 200) {
+				System.err.println("[Midgard] Backend HTTP " + r.statusCode());
 				return;
 			}
 			JsonObject root = JsonParser.parseString(r.body()).getAsJsonObject();
 
+			Map<String, double[]> bz = new HashMap<>();
+			if (root.has("bazaar")) {
+				for (Map.Entry<String, JsonElement> e : root.getAsJsonObject("bazaar").entrySet()) {
+					JsonObject o = e.getValue().getAsJsonObject();
+					bz.put(e.getKey(), new double[] { d(o, "buy"), d(o, "sell") });
+				}
+			}
 			Map<String, double[]> au = new HashMap<>();
 			if (root.has("auctions")) {
 				for (Map.Entry<String, JsonElement> e : root.getAsJsonObject("auctions").entrySet()) {
@@ -98,10 +110,12 @@ public class PriceApi implements JacobSource {
 					}
 				}
 			}
+			bazaar = bz;
 			auctions = au;
 			jacob = jc;
+			lastSuccessMs = System.currentTimeMillis();
 		} catch (Exception e) {
-			System.err.println("[Midgard] Preis-API Fehler: " + e.getMessage());
+			System.err.println("[Midgard] Keine Backend-Verbindung: " + e.getMessage());
 		} finally {
 			fetching = false;
 		}
@@ -111,13 +125,22 @@ public class PriceApi implements JacobSource {
 		return o.has(k) && !o.get(k).isJsonNull() ? o.get(k).getAsDouble() : 0;
 	}
 
+	/**
+	 * true, solange die letzte erfolgreiche Backend-Abfrage nicht zu lange her
+	 * ist. false = (noch) keine Backend-Verbindung.
+	 */
+	public boolean isOnline() {
+		return lastSuccessMs > 0 && System.currentTimeMillis() - lastSuccessMs < ONLINE_GRACE_MS;
+	}
+
+	/** {buy, sell} oder null, wenn das Item nicht im Bazaar ist. */
+	public double[] bazaar(String id) {
+		return bazaar.get(id);
+	}
+
 	/** {min, max, avg, lowestBin} oder null. */
 	public double[] auction(String id) {
 		return auctions.get(id);
-	}
-
-	public boolean hasAuctions() {
-		return !auctions.isEmpty();
 	}
 
 	public boolean hasJacob() {

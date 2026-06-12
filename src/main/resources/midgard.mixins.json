@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "com.midgard.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"minVersion": "0.8",
+	"client": [
+		"DrawContextMixin",
+		"HandledScreenMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

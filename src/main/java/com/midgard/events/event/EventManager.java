@@ -30,12 +30,11 @@ public class EventManager {
 		ModConfig cfg = Midgard.config;
 		SkyblockCalendar cal = SkyblockCalendar.INSTANCE;
 
-		// 1) Jacob's Contest. Quelle: eigenes Backend (prices.json) bevorzugt,
-		//    sonst direkt elitebot (voller Jahresplan → 3–5 sofort), sonst der
-		//    In-Game-Plan (~2). Alle drei liefern den vollen Plan außer In-Game.
-		com.midgard.price.JacobSource jsrc = !cfg.isEventEnabled(EventType.JACOB_CONTEST) ? null
+		// 1) Jacob's Contest. Quelle: eigenes Backend (prices.json, voller
+		//    Jahresplan); ohne Backend-Verbindung der In-Game-Plan (~2 Contests
+		//    aus dem Jacob-Menü). Clients reden NIE direkt mit Hypixel/elitebot.
+		com.midgard.price.PriceApi jsrc = !cfg.isEventEnabled(EventType.JACOB_CONTEST) ? null
 				: com.midgard.price.PriceApi.INSTANCE.hasJacob() ? com.midgard.price.PriceApi.INSTANCE
-				: com.midgard.price.JacobOnline.INSTANCE.hasJacob() ? com.midgard.price.JacobOnline.INSTANCE
 				: null;
 		if (jsrc != null) {
 			long nowSec = System.currentTimeMillis() / 1000;
