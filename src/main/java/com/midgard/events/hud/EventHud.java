@@ -73,20 +73,31 @@ public class EventHud {
 
 	// ---- Maße (alles in skalierten GUI-Pixeln) ----------------------------
 
+	/**
+	 * Effektive Skalierung der gerade vermessenen/gezeichneten Gruppe:
+	 * globale HUD-Größe × Einzel-Größe der Gruppe. Wird vor jeder Gruppe
+	 * gesetzt (Rendern läuft nur auf dem Client-Thread).
+	 */
+	private float scale = 1f;
+
+	private void useScale(ModConfig cfg, EventType type) {
+		scale = cfg.hudScale * (type == null ? 1f : cfg.groupScale(type));
+	}
+
 	private float fontSize(ModConfig cfg) {
-		return HUD_FONT * cfg.hudScale;
+		return HUD_FONT * scale;
 	}
 
 	private int iconSize(ModConfig cfg) {
-		return Math.max(8, Math.round(16 * cfg.hudIconScale * cfg.hudScale));
+		return Math.max(8, Math.round(16 * cfg.hudIconScale * scale));
 	}
 
 	private int iconStep(ModConfig cfg) {
-		return iconSize(cfg) + Math.max(1, Math.round(2 * cfg.hudScale));
+		return iconSize(cfg) + Math.max(1, Math.round(2 * scale));
 	}
 
 	private int sp(ModConfig cfg, float base) {
-		return Math.max(1, Math.round(base * cfg.hudScale));
+		return Math.max(1, Math.round(base * scale));
 	}
 
 	private int capH(ModConfig cfg, boolean bold) {
@@ -158,27 +169,42 @@ public class EventHud {
 		return new int[] { frameW, titleH, rowsH, groupH, rh };
 	}
 
-	/** {panelW, panelH} = Gesamthülle aller (gestapelten) Gruppen-Rahmen. */
-	private int[] measure(ModConfig cfg, Map<EventType, List<EventDisplay>> groups) {
-		int maxW = 0;
-		int totalH = 0;
-		int gap = sp(cfg, GROUP_GAP);
-		for (Map.Entry<EventType, List<EventDisplay>> g : groups.entrySet()) {
-			int[] m = groupMetrics(cfg, g.getKey(), g.getValue());
-			maxW = Math.max(maxW, m[0]);
-			totalH += m[3] + gap;
+	/** Position + Maße einer HUD-Gruppe (für den HUD-Editor). */
+	public record GroupRect(EventType type, int x, int y, int w, int h) {
+		public boolean contains(double mx, double my) {
+			return mx >= x - 2 && mx <= x + w + 2 && my >= y - 2 && my <= y + h + 2;
 		}
-		return new int[] { maxW, Math.max(0, totalH - gap) };
+	}
+
+	/**
+	 * Berechnet die Rechtecke aller Gruppen: Gruppen ohne eigene Position
+	 * stapeln sich unter (hudX, hudY); gelöste Gruppen liegen frei.
+	 */
+	public List<GroupRect> layout(ModConfig cfg, List<EventDisplay> events) {
+		Map<EventType, List<EventDisplay>> groups = group(events);
+		List<GroupRect> out = new ArrayList<>();
+		useScale(cfg, null);
+		int gap = sp(cfg, GROUP_GAP);
+		int stackY = cfg.hudY;
+		for (Map.Entry<EventType, List<EventDisplay>> g : groups.entrySet()) {
+			EventType type = g.getKey();
+			useScale(cfg, type);
+			int[] m = groupMetrics(cfg, type, g.getValue());
+			if (cfg.hasGroupPos(type)) {
+				out.add(new GroupRect(type, cfg.groupX(type), cfg.groupY(type), m[0], m[3]));
+			} else {
+				out.add(new GroupRect(type, cfg.hudX, stackY, m[0], m[3]));
+				stackY += m[3] + gap;
+			}
+		}
+		return out;
 	}
 
 	private void draw(DrawContext context, ModConfig cfg, List<EventDisplay> events, boolean preview) {
 		Map<EventType, List<EventDisplay>> groups = group(events);
-		int ox = cfg.hudX;
-		int oy = cfg.hudY;
-		int gap = sp(cfg, GROUP_GAP);
-		int y = oy;
-		for (Map.Entry<EventType, List<EventDisplay>> g : groups.entrySet()) {
-			y += drawGroup(context, cfg, g.getKey(), g.getValue(), ox, y, preview) + gap;
+		for (GroupRect r : layout(cfg, events)) {
+			useScale(cfg, r.type());
+			drawGroup(context, cfg, r.type(), groups.get(r.type()), r.x(), r.y(), preview);
 		}
 	}
 
@@ -232,11 +258,4 @@ public class EventHud {
 		outlined(context, t, cursor + sp(cfg, 4), yTop, fs, d.active ? COLOR_ACTIVE : COLOR_UPCOMING, false);
 	}
 
-	public int approxWidth(List<EventDisplay> events) {
-		return measure(Midgard.config, group(events))[0];
-	}
-
-	public int approxHeight(List<EventDisplay> events) {
-		return measure(Midgard.config, group(events))[1];
-	}
 }

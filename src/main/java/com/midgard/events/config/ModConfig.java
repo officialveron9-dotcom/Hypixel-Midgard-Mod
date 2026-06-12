@@ -47,6 +47,11 @@ public class ModConfig {
 	public Map<String, Integer> upcomingPerCategory = new HashMap<>();
 	/** Pro Event: Anzahl kommender Events, die zusätzlich angezeigt werden. */
 	public Map<String, Integer> upcomingPerEvent = new HashMap<>();
+	/** Pro HUD-Gruppe: eigene Position (vom Stapel gelöst). Schlüssel = EventType.name(). */
+	public Map<String, Integer> hudGroupX = new HashMap<>();
+	public Map<String, Integer> hudGroupY = new HashMap<>();
+	/** Pro HUD-Gruppe: Größenfaktor (1.0 = Standard). */
+	public Map<String, Float> hudGroupScale = new HashMap<>();
 
 	// --- Logik -------------------------------------------------------------
 
@@ -87,6 +92,41 @@ public class ModConfig {
 		upcomingPerEvent.put(type.name(), Math.max(1, Math.min(10, value)));
 	}
 
+	// --- HUD-Gruppen (Einzel-Position + Einzel-Größe) ------------------------
+
+	public boolean hasGroupPos(EventType type) {
+		return hudGroupX.containsKey(type.name()) && hudGroupY.containsKey(type.name());
+	}
+
+	public int groupX(EventType type) {
+		return hudGroupX.getOrDefault(type.name(), hudX);
+	}
+
+	public int groupY(EventType type) {
+		return hudGroupY.getOrDefault(type.name(), hudY);
+	}
+
+	public void setGroupPos(EventType type, int x, int y) {
+		hudGroupX.put(type.name(), x);
+		hudGroupY.put(type.name(), y);
+	}
+
+	/** Zurück in den normalen Stapel. */
+	public void clearGroupPos(EventType type) {
+		hudGroupX.remove(type.name());
+		hudGroupY.remove(type.name());
+	}
+
+	/** Größenfaktor einer HUD-Gruppe (0.5..2.5, Standard 1.0). */
+	public float groupScale(EventType type) {
+		Float f = hudGroupScale.get(type.name());
+		return f == null ? 1f : Math.max(0.5f, Math.min(2.5f, f));
+	}
+
+	public void setGroupScale(EventType type, float value) {
+		hudGroupScale.put(type.name(), Math.max(0.5f, Math.min(2.5f, value)));
+	}
+
 	// --- Laden / Speichern -------------------------------------------------
 
 	public static ModConfig load() {
@@ -106,6 +146,15 @@ public class ModConfig {
 					}
 					if (cfg.upcomingPerEvent == null) {
 						cfg.upcomingPerEvent = new HashMap<>();
+					}
+					if (cfg.hudGroupX == null) {
+						cfg.hudGroupX = new HashMap<>();
+					}
+					if (cfg.hudGroupY == null) {
+						cfg.hudGroupY = new HashMap<>();
+					}
+					if (cfg.hudGroupScale == null) {
+						cfg.hudGroupScale = new HashMap<>();
 					}
 					if (cfg.globalFontName == null) {
 						cfg.globalFontName = "";
