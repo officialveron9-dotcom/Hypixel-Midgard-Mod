@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12e (HUD-Editor: Elemente einzeln waehlen/ziehen/skalieren)");
+		System.out.println("[Midgard] init build=2026-06-12f (HUD-Text: weicher Schlagschatten statt Umriss)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

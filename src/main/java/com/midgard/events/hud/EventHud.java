@@ -125,13 +125,15 @@ public class EventHud {
 		}
 	}
 
-	/** Text mit dunklem Umriss (1px in 4 Richtungen) – auch ohne Hintergrund gut lesbar. */
+	/**
+	 * Text mit weichem Schlagschatten (zwei Stufen nach unten rechts) statt
+	 * hartem Umriss – wirkt ohne Hintergrund deutlich ruhiger, bleibt aber
+	 * auf hellem Untergrund lesbar. Der Schatten wächst mit der Skalierung.
+	 */
 	private void outlined(DrawContext c, String s, int x, int yTop, float size, int color, boolean bold) {
-		int sh = 0xD0000000;
-		text(c, s, x - 1, yTop, size, sh, bold);
-		text(c, s, x + 1, yTop, size, sh, bold);
-		text(c, s, x, yTop - 1, size, sh, bold);
-		text(c, s, x, yTop + 1, size, sh, bold);
+		int off = Math.max(1, Math.round(scale));
+		text(c, s, x + off + 1, yTop + off + 1, size, 0x48000000, bold);
+		text(c, s, x + off, yTop + off, size, 0xB4000000, bold);
 		text(c, s, x, yTop, size, color, bold);
 	}
 
