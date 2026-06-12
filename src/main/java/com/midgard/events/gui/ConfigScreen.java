@@ -270,6 +270,12 @@ public class ConfigScreen extends Screen {
 					cfg.showPrices = !cfg.showPrices;
 					cfg.save();
 				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("size"),
+				"Borderless-Vollbild", "Randloses Fenster in Monitorgröße – Alt-Tab ohne Minimieren.",
+				() -> cfg.borderless, () -> {
+					cfg.borderless = !cfg.borderless;
+					cfg.save();
+				}));
 		out.add(fontHeaderRow(context, mouseX, mouseY, cardX, cardW));
 		if (fontExpanded) {
 			// Kompaktes Grid statt einer Zeile pro Schrift.

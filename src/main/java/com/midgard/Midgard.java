@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12m (Mining-Tab: Commissions, Pickaxe-Ability, Events)");
+		System.out.println("[Midgard] init build=2026-06-12n (Borderless-Vollbild unter Allgemein)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -90,6 +90,9 @@ public class Midgard implements ClientModInitializer {
 
 			// Jeden Tick: offenes Kalender-/Jacob-GUI auslesen (nur lesend).
 			JacobCalendarReader.INSTANCE.tick(client);
+
+			// Borderless-Vollbild mit der Config abgleichen (greift sofort).
+			com.midgard.util.Borderless.tick(client);
 
 			// Etwa zweimal pro Sekunde reicht völlig.
 			if (++tickCounter >= 10) {

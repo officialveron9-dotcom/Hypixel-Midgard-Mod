@@ -33,6 +33,8 @@ public class ModConfig {
 	public boolean showPrices = true;
 	/** Eigene Statusleisten: Leben links, XP mittig, Mana rechts (Text innen). */
 	public boolean customBars = true;
+	/** Borderless-Vollbild: randloses Fenster in Monitorgröße (Alt-Tab ohne Minimieren). */
+	public boolean borderless = false;
 
 	// --- Garden (alles einzeln schaltbar) -----------------------------------
 	/** Besucherliste im HUD. */
