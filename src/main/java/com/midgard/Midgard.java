@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12j (Coins/h, Optimal-Speed, Contest-Warnung, Pest-Chat)");
+		System.out.println("[Midgard] init build=2026-06-12k (Farming-Box kombiniert, Abgabe-Timer, ohne elitebot-Link)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

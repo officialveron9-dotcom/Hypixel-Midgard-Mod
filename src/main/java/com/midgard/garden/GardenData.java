@@ -238,6 +238,14 @@ public class GardenData {
 
 	private static final Pattern PEST_CHAT = Pattern.compile(
 			"(?i)pest.{0,30}?(?:appeared|spawned).{0,20}?Plot\\s*[-–]?\\s*(\\w+)");
+	/** Abgabe von Schädlingen beim Pesthunter (Phillip) – Best-Effort. */
+	private static final Pattern PEST_HANDIN = Pattern.compile(
+			"(?i)(?:traded|exchanged|gave|handed|abgegeben).{0,40}?pests?|pesthunter");
+
+	/** Cooldown nach der Schädlings-Abgabe (Phillip). */
+	public static final long HANDIN_COOLDOWN_SEC = 60 * 60;
+	/** Zeitpunkt (ms) der letzten Schädlings-Abgabe, 0 = noch keine gesehen. */
+	public volatile long pestHandinMs = 0;
 
 	/**
 	 * Chat-Meldung (nur lesend): Hypixel meldet neue Schädlinge sofort im Chat
@@ -256,6 +264,24 @@ public class GardenData {
 			}
 			pestCount = Math.max(pestCount + 1, plots.size());
 		}
+		// Abgabe beim Pesthunter -> Cooldown-Timer starten. Format ist
+		// Best-Effort; Phillip-Zeilen werden zur Diagnose geloggt.
+		String lower = message.toLowerCase(Locale.ROOT);
+		if (lower.contains("phillip") || lower.contains("pesthunter")) {
+			System.out.println("[Midgard] Pesthunter-Chat: " + message);
+			if (PEST_HANDIN.matcher(message).find()) {
+				pestHandinMs = System.currentTimeMillis();
+			}
+		}
+	}
+
+	/** Restsekunden des Abgabe-Cooldowns oder -1 (keine Abgabe gesehen/abgelaufen). */
+	public long handinCooldownRemaining() {
+		if (pestHandinMs <= 0) {
+			return -1;
+		}
+		long remain = HANDIN_COOLDOWN_SEC - (System.currentTimeMillis() - pestHandinMs) / 1000;
+		return remain > 0 ? remain : -1;
 	}
 
 	/** Steht der Spieler gerade auf einem befallenen Plot mit dieser Nummer/Namen? */

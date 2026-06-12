@@ -88,78 +88,91 @@ public final class GardenHud {
 				boolean here = sample ? p.equals("2") : g.isCurrentPlot(p);
 				rows.add(new HudRow(List.of(), "Plot " + p, here ? RED : YELLOW, here));
 			}
+			long cd = g.handinCooldownRemaining();
+			if (preview && cd < 0) {
+				cd = 43 * 60;
+			}
+			if (cd >= 0) {
+				rows.add(new HudRow(List.of(), "Abgabe in " + TimeUtil.format(cd), DIM, false));
+			} else if (g.pestHandinMs > 0) {
+				rows.add(new HudRow(List.of(), "Abgabe bereit", GREEN, false));
+			}
 			out.add(new HudGroup(KEY_PESTS, "Schädlinge", rows));
 		}
 
-		// 3) Werkzeug: Cultivating-Level + Fortschritt zum nächsten Level.
-		if (cfg.gardenTool) {
+		// 3-5) EINE kombinierte Farming-Box (wie bei Taunahi): Cultivating,
+		// Crops/min, Coins/h, Blöcke/s, Optimal-Speed, Milestone, Yaw/Pitch.
+		// Sichtbar mit Farm-Werkzeug in der Hand oder beim aktiven Farmen.
+		if ((cfg.gardenTool || cfg.gardenStats || cfg.gardenCollection)
+				&& (preview || f.farming() || f.holdingFarmTool())) {
+			String crop = f.crop().isEmpty() ? (preview ? "Wheat" : "") : f.crop();
 			List<HudRow> rows = new ArrayList<>();
-			if (f.cultivating >= 0) {
-				int lvl = f.cultivatingLevel();
-				long next = f.cultivatingNext();
-				rows.add(new HudRow(List.of(Items.IRON_HOE),
-						"Cultivating " + ROMAN[Math.min(lvl, 10)], WHITE, false));
-				rows.add(new HudRow(List.of(), next < 0
-						? num(f.cultivating) + " (Max)"
-						: num(f.cultivating) + " / " + num(next), YELLOW, false));
-			} else if (preview) {
-				rows.add(new HudRow(List.of(Items.IRON_HOE), "Cultivating VII", WHITE, false));
-				rows.add(new HudRow(List.of(), "5,2M / 20M", YELLOW, false));
-			}
-			if (!rows.isEmpty()) {
-				out.add(new HudGroup(KEY_TOOL, "Werkzeug", rows));
-			}
-		}
 
-		// 4) Farming-Statistik: nur während aktiv gefarmt wird.
-		if (cfg.gardenStats && (preview || f.farming())) {
-			String crop = f.crop().isEmpty() ? (preview ? "Wheat" : "Farming") : f.crop();
-			Item icon = EventIcons.forCrop(crop);
-			List<HudRow> rows = new ArrayList<>();
-			double cpm = f.cropsPerMinute();
-			double bps = f.blocksPerSecond();
-			if (preview && cpm <= 0) {
-				cpm = 1180;
-				bps = 19.6;
+			if (cfg.gardenTool) {
+				long cult = preview && f.cultivating < 0 ? 167_924_090L : f.cultivating;
+				if (cult >= 0) {
+					int lvl = f.cultivatingLevel();
+					String lvlTxt = f.cultivating >= 0 ? " (" + ROMAN[Math.min(lvl, 10)] + ")" : " (IX)";
+					rows.add(new HudRow(List.of(Items.IRON_HOE),
+							"Cultivating: " + full(cult) + lvlTxt, WHITE, false));
+				}
 			}
-			rows.add(new HudRow(List.of(icon), "Crops/min: " + num(Math.round(cpm)), GREEN, false));
-			rows.add(new HudRow(List.of(), String.format("Blöcke/s: %.1f", bps), WHITE, false));
-			// Coins/h: Crops/min x Bazaar-Sofortverkauf (Preis vom Backend).
-			double sell = bazaarSell(crop);
-			if (preview && sell <= 0) {
-				sell = 4.4;
-			}
-			if (sell > 0 && cpm > 0) {
-				rows.add(new HudRow(List.of(), "Coins/h: " + num(Math.round(cpm * 60 * sell)), GOLD, false));
-			}
-			int speed = optimalSpeed(crop);
-			if (speed > 0) {
-				rows.add(new HudRow(List.of(), "Optimal: " + speed + " Speed", DIM, false));
-			}
-			out.add(new HudGroup(KEY_STATS, crop, rows));
-		}
 
-		// 5) Collection: Fortschritt + Zeit bis zum nächsten Rang.
-		if (cfg.gardenCollection) {
-			FarmingTracker.Collection col = f.collection();
-			List<HudRow> rows = new ArrayList<>();
-			if (col != null) {
-				long est = f.collectionEstimate(col);
-				long eta = f.collectionEtaSeconds(col);
-				Item icon = EventIcons.forCrop(col.crop());
-				rows.add(new HudRow(List.of(icon),
-						num(est) + " / " + num(col.target()), WHITE, false));
-				rows.add(new HudRow(List.of(), eta < 0
-						? "Rang: farme für ETA"
-						: "Rang in " + TimeUtil.format(eta), eta < 0 ? YELLOW : GREEN, false));
-			} else if (preview) {
-				rows.add(new HudRow(List.of(Items.WHEAT), "84,3k / 100k", WHITE, false));
-				rows.add(new HudRow(List.of(), "Rang in 1h 12m", GREEN, false));
-			} else if (f.farming()) {
-				rows.add(new HudRow(List.of(), "Milestone-Menü 1x öffnen", YELLOW, false));
+			if (cfg.gardenStats) {
+				double cpm = f.cropsPerMinute();
+				double bps = f.blocksPerSecond();
+				if (preview && cpm <= 0) {
+					cpm = 52_440;
+					bps = 20.0;
+				}
+				rows.add(new HudRow(List.of(), "Crops/min: " + full(Math.round(cpm)), GREEN, false));
+				double sell = bazaarSell(crop);
+				if (preview && sell <= 0) {
+					sell = 4.2;
+				}
+				if (sell > 0 && cpm > 0) {
+					rows.add(new HudRow(List.of(),
+							"Coins/h: " + full(Math.round(cpm * 60 * sell)) + " (Bazaar)", GOLD, false));
+				}
+				rows.add(new HudRow(List.of(), String.format("Blöcke/s: %.1f", bps), WHITE, false));
+				int speed = optimalSpeed(crop);
+				if (speed > 0) {
+					rows.add(new HudRow(List.of(), "Optimal: " + speed + " Speed", DIM, false));
+				}
 			}
+
+			if (cfg.gardenCollection) {
+				FarmingTracker.Collection col = f.collection();
+				if (col != null) {
+					long est = f.collectionEstimate(col);
+					long eta = f.collectionEtaSeconds(col);
+					rows.add(new HudRow(List.of(), "Milestone: " + num(est) + " / " + num(col.target()),
+							WHITE, false));
+					if (eta >= 0) {
+						rows.add(new HudRow(List.of(), "Rang in " + TimeUtil.format(eta), GREEN, false));
+					}
+				} else if (preview) {
+					rows.add(new HudRow(List.of(), "Milestone: 84,3k / 100k", WHITE, false));
+					rows.add(new HudRow(List.of(), "Rang in 1h 12m", GREEN, false));
+				} else {
+					rows.add(new HudRow(List.of(), "Milestone-Menü 1x öffnen", YELLOW, false));
+				}
+			}
+
+			if (cfg.gardenStats) {
+				net.minecraft.client.network.ClientPlayerEntity p =
+						net.minecraft.client.MinecraftClient.getInstance().player;
+				if (p != null) {
+					float yaw = net.minecraft.util.math.MathHelper.wrapDegrees(p.getYaw());
+					rows.add(new HudRow(List.of(), String.format("Yaw: %.2f", yaw), DIM, false));
+					rows.add(new HudRow(List.of(), String.format("Pitch: %.2f", p.getPitch()), DIM, false));
+				}
+			}
+
 			if (!rows.isEmpty()) {
-				out.add(new HudGroup(KEY_COLLECTION, "Collection", rows));
+				Item icon = crop.isEmpty() ? Items.IRON_HOE : EventIcons.forCrop(crop);
+				rows.set(0, new HudRow(List.of(icon), rows.get(0).text(), rows.get(0).color(), false));
+				out.add(new HudGroup(KEY_STATS, crop.isEmpty() ? "Farming" : "Farming – " + crop, rows));
 			}
 		}
 
@@ -271,6 +284,11 @@ public final class GardenHud {
 
 	private static boolean empty(String v) {
 		return v.startsWith("0") || v.toLowerCase(java.util.Locale.ROOT).contains("empty");
+	}
+
+	/** Volle Zahl mit Tausenderpunkten: 167.924.090. */
+	private static String full(long v) {
+		return String.format(java.util.Locale.GERMAN, "%,d", v);
 	}
 
 	/** Kompakte Zahl: 1,2B / 3,4M / 12,3k / 123. */

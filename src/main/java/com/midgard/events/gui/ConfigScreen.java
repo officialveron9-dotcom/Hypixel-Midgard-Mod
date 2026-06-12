@@ -175,22 +175,6 @@ public class ConfigScreen extends Screen {
 			y += rowH + 5;
 		}
 
-		// Pflicht-Quellenangabe (elitebot.dev liefert den Jacob-Plan).
-		String link = "Daten: elitebot.dev";
-		int linkX = px + 14;
-		int linkY = py + ph - 20;
-		int linkW = txtW(link, false);
-		boolean linkHover = mouseX >= linkX && mouseX <= linkX + linkW && mouseY >= linkY - 2 && mouseY <= linkY + 11;
-		txt(context, link, linkX, linkY, linkHover ? ACCENT : TEXT_DIM, false);
-		clickables.add(new Clickable(linkX, linkY - 2, linkX + linkW, linkY + 11,
-				() -> openUrl("https://elitebot.dev/")));
-	}
-
-	private void openUrl(String url) {
-		try {
-			net.minecraft.util.Util.getOperatingSystem().open(java.net.URI.create(url));
-		} catch (Exception ignored) {
-		}
 	}
 
 	private void drawHeader(DrawContext context, int mouseX, int mouseY) {

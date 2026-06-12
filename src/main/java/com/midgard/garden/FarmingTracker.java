@@ -57,6 +57,7 @@ public class FarmingTracker {
 	public volatile String blockCrop = "";
 	public volatile long counter = -1;
 	public volatile long cultivating = -1;
+	private volatile long lastToolMs = 0;
 	private int lastScreenHash = 0;
 
 	public void tick(MinecraftClient mc) {
@@ -96,6 +97,7 @@ public class FarmingTracker {
 		}
 		toolCrop = crop;
 		counter = cnt;
+		lastToolMs = now;
 		samples.addLast(new Sample(now, cnt));
 		while (!samples.isEmpty() && now - samples.peekFirst().timeMs > 90_000) {
 			samples.removeFirst();
@@ -223,6 +225,11 @@ public class FarmingTracker {
 			}
 		}
 		return n / 5.0;
+	}
+
+	/** Hält der Spieler gerade ein Farm-Werkzeug (mit Zähler) in der Hand? */
+	public boolean holdingFarmTool() {
+		return System.currentTimeMillis() - lastToolMs < 2_000;
 	}
 
 	/** Wird gerade aktiv gefarmt (Zähler gestiegen oder Block abgebaut, 4 s)? */
