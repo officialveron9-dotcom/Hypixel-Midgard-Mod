@@ -90,7 +90,8 @@ public class ConfigScreen extends Screen {
 			new Tab("Allgemein", false, 0xFFFFFFFF),
 			new Tab("Interface", false, 0xFF57D8FF),
 			new Tab("Events", true, ACCENT),
-			new Tab("Garden", false, 0xFF5BE36B));
+			new Tab("Garden", false, 0xFF5BE36B),
+			new Tab("Mining", false, 0xFF4DA6FF));
 	private final List<Clickable> clickables = new ArrayList<>();
 	private final Map<String, Float> anim = new HashMap<>();
 	private final java.util.Set<EventCategory> expanded = new java.util.HashSet<>();
@@ -210,6 +211,8 @@ public class ConfigScreen extends Screen {
 			buildEventRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else if (tab.label().equals("Garden")) {
 			buildGardenRows(rows, context, mouseX, mouseY, cardX, cardW);
+		} else if (tab.label().equals("Mining")) {
+			buildMiningRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else if (tab.label().equals("Interface")) {
 			buildInterfaceRows(rows, context, mouseX, mouseY, cardX, cardW);
 		} else {
@@ -333,6 +336,24 @@ public class ConfigScreen extends Screen {
 		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Contest-Warnung (Chat)",
 				() -> cfg.jacobWarn, () -> {
 					cfg.jacobWarn = !cfg.jacobWarn;
+					cfg.save();
+				}));
+	}
+
+	private void buildMiningRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Commissions",
+				() -> cfg.miningCommissions, () -> {
+					cfg.miningCommissions = !cfg.miningCommissions;
+					cfg.save();
+				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Pickaxe-Ability",
+				() -> cfg.miningAbility, () -> {
+					cfg.miningAbility = !cfg.miningAbility;
+					cfg.save();
+				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Mining-Events",
+				() -> cfg.isEventEnabled(EventType.MINING_EVENT), () -> {
+					cfg.setEventEnabled(EventType.MINING_EVENT, !cfg.isEventEnabled(EventType.MINING_EVENT));
 					cfg.save();
 				}));
 	}

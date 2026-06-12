@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12l (Interface-Tab, eigene Statusleisten: Leben/XP/Mana)");
+		System.out.println("[Midgard] init build=2026-06-12m (Mining-Tab: Commissions, Pickaxe-Ability, Events)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -71,6 +71,7 @@ public class Midgard implements ClientModInitializer {
 			if (!overlay) {
 				LiveEventTracker.INSTANCE.onChat(message.getString());
 				com.midgard.garden.GardenData.INSTANCE.onChat(message.getString());
+				com.midgard.mining.MiningData.INSTANCE.onChat(message.getString());
 			} else {
 				// Actionbar: Hypixel zeigt dort Leben/Mana (für die eigenen Leisten).
 				com.midgard.bars.StatusBars.onActionBar(message.getString());
@@ -96,6 +97,7 @@ public class Midgard implements ClientModInitializer {
 				SkyblockHook.INSTANCE.update(client);
 				EventManager.INSTANCE.update();
 				com.midgard.garden.GardenData.INSTANCE.update(client);
+				com.midgard.mining.MiningData.INSTANCE.update(client);
 				com.midgard.events.event.JacobWarner.INSTANCE.tick(client);
 				com.midgard.price.PriceApi.INSTANCE.maybeRefresh();
 			}

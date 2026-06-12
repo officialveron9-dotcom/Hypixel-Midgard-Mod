@@ -102,6 +102,7 @@ public class EventHud {
 			out.add(new HudGroup(g.getKey().name(), g.getKey().displayName, rows));
 		}
 		out.addAll(GardenHud.groups(cfg, preview));
+		out.addAll(com.midgard.mining.MiningHud.groups(cfg, preview));
 		return out;
 	}
 

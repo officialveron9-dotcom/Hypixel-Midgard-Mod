@@ -51,6 +51,12 @@ public class ModConfig {
 	public boolean gardenJacob = true;
 	/** Lokale Chat-Warnung 5 Min / 1 Min vor dem nächsten Jacob-Contest. */
 	public boolean jacobWarn = true;
+
+	// --- Mining (alles einzeln schaltbar) ------------------------------------
+	/** Commissions mit Fortschritt im HUD. */
+	public boolean miningCommissions = true;
+	/** Pickaxe-Ability-Cooldown (Pickobulus, Mining Speed Boost ...). */
+	public boolean miningAbility = true;
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 
