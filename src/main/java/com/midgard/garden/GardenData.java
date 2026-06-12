@@ -236,6 +236,28 @@ public class GardenData {
 		}
 	}
 
+	private static final Pattern PEST_CHAT = Pattern.compile(
+			"(?i)pest.{0,30}?(?:appeared|spawned).{0,20}?Plot\\s*[-–]?\\s*(\\w+)");
+
+	/**
+	 * Chat-Meldung (nur lesend): Hypixel meldet neue Schädlinge sofort im Chat
+	 * ("ൠ A Pest has appeared in Plot - 4!") – schneller als die Tab-Liste.
+	 */
+	public void onChat(String message) {
+		if (message == null) {
+			return;
+		}
+		Matcher m = PEST_CHAT.matcher(message);
+		if (m.find()) {
+			List<String> plots = new ArrayList<>(infestedPlots);
+			if (!plots.contains(m.group(1))) {
+				plots.add(m.group(1));
+				infestedPlots = plots;
+			}
+			pestCount = Math.max(pestCount + 1, plots.size());
+		}
+	}
+
 	/** Steht der Spieler gerade auf einem befallenen Plot mit dieser Nummer/Namen? */
 	public boolean isCurrentPlot(String plot) {
 		if (currentPlot.isEmpty() || plot == null || plot.isEmpty()) {

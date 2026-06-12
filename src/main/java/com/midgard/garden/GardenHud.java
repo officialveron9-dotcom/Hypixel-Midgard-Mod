@@ -36,6 +36,8 @@ public final class GardenHud {
 	private static final int GREEN = 0xFF5BE36B;
 	private static final int YELLOW = 0xFFF2C94C;
 	private static final int RED = 0xFFFF5A52;
+	private static final int GOLD = 0xFFFFC85C;
+	private static final int DIM = 0xFF9A9AA5;
 
 	private static final String[] ROMAN = {
 			"0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X" };
@@ -122,6 +124,18 @@ public final class GardenHud {
 			}
 			rows.add(new HudRow(List.of(icon), "Crops/min: " + num(Math.round(cpm)), GREEN, false));
 			rows.add(new HudRow(List.of(), String.format("Blöcke/s: %.1f", bps), WHITE, false));
+			// Coins/h: Crops/min x Bazaar-Sofortverkauf (Preis vom Backend).
+			double sell = bazaarSell(crop);
+			if (preview && sell <= 0) {
+				sell = 4.4;
+			}
+			if (sell > 0 && cpm > 0) {
+				rows.add(new HudRow(List.of(), "Coins/h: " + num(Math.round(cpm * 60 * sell)), GOLD, false));
+			}
+			int speed = optimalSpeed(crop);
+			if (speed > 0) {
+				rows.add(new HudRow(List.of(), "Optimal: " + speed + " Speed", DIM, false));
+			}
 			out.add(new HudGroup(KEY_STATS, crop, rows));
 		}
 
@@ -208,6 +222,41 @@ public final class GardenHud {
 		}
 
 		return out;
+	}
+
+	/** Bazaar-Sofortverkaufspreis des Roh-Crops (vom Backend) oder 0. */
+	private static double bazaarSell(String crop) {
+		String id = switch (crop) {
+			case "Wheat" -> "WHEAT";
+			case "Carrot" -> "CARROT_ITEM";
+			case "Potato" -> "POTATO_ITEM";
+			case "Pumpkin" -> "PUMPKIN";
+			case "Melon" -> "MELON";
+			case "Sugar Cane" -> "SUGAR_CANE";
+			case "Cactus" -> "CACTUS";
+			case "Cocoa Beans" -> "INK_SACK:3";
+			case "Mushroom" -> "RED_MUSHROOM";
+			case "Nether Wart" -> "NETHER_STALK";
+			default -> "";
+		};
+		if (id.isEmpty()) {
+			return 0;
+		}
+		double[] bz = com.midgard.price.PriceApi.INSTANCE.bazaar(id);
+		return bz == null ? 0 : bz[1];
+	}
+
+	/** Übliche optimale Lauf-Geschwindigkeit pro Crop (Standard-Farmdesigns). */
+	private static int optimalSpeed(String crop) {
+		return switch (crop) {
+			case "Wheat", "Carrot", "Potato", "Nether Wart" -> 93;
+			case "Pumpkin", "Melon" -> 258;
+			case "Cocoa Beans" -> 155;
+			case "Sugar Cane" -> 328;
+			case "Cactus" -> 464;
+			case "Mushroom" -> 233;
+			default -> 0;
+		};
 	}
 
 	/** Stufe (Index in BRACKET_*) zu einer Top-Prozent-Platzierung. */

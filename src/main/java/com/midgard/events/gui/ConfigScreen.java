@@ -334,6 +334,11 @@ public class ConfigScreen extends Screen {
 					cfg.gardenJacob = !cfg.gardenJacob;
 					cfg.save();
 				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Contest-Warnung (Chat)",
+				() -> cfg.jacobWarn, () -> {
+					cfg.jacobWarn = !cfg.jacobWarn;
+					cfg.save();
+				}));
 	}
 
 	/** Kompakte Schalter-Zeile ohne Icon (Garden-Tab). */

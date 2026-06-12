@@ -47,6 +47,8 @@ public class ModConfig {
 	public boolean gardenComposter = true;
 	/** Jacob-Contest live: Score, Platzierung, nächste Medaille, Endzeit. */
 	public boolean gardenJacob = true;
+	/** Lokale Chat-Warnung 5 Min / 1 Min vor dem nächsten Jacob-Contest. */
+	public boolean jacobWarn = true;
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 

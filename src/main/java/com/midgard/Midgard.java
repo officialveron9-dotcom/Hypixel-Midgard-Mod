@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12i (Composter, Jacob-Live, kompaktes HUD, kein Ueberlappen, Garden-Menue kompakt)");
+		System.out.println("[Midgard] init build=2026-06-12j (Coins/h, Optimal-Speed, Contest-Warnung, Pest-Chat)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -70,6 +70,7 @@ public class Midgard implements ClientModInitializer {
 		ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
 			if (!overlay) {
 				LiveEventTracker.INSTANCE.onChat(message.getString());
+				com.midgard.garden.GardenData.INSTANCE.onChat(message.getString());
 			}
 		});
 
@@ -92,6 +93,7 @@ public class Midgard implements ClientModInitializer {
 				SkyblockHook.INSTANCE.update(client);
 				EventManager.INSTANCE.update();
 				com.midgard.garden.GardenData.INSTANCE.update(client);
+				com.midgard.events.event.JacobWarner.INSTANCE.tick(client);
 				com.midgard.price.PriceApi.INSTANCE.maybeRefresh();
 			}
 		});
