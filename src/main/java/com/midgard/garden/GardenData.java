@@ -1,9 +1,11 @@
 package com.midgard.garden;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -11,7 +13,14 @@ import java.util.regex.Pattern;
 import com.midgard.events.skyblock.ScoreboardReader;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.LoreComponent;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.text.Text;
 
 /**
  * Liest den Garden-Status (Hypixel SkyBlock) rein lesend aus Tab-Liste und
@@ -43,6 +52,8 @@ public class GardenData {
 	public volatile int pestCount = 0;
 	public volatile List<String> infestedPlots = List.of();
 	public volatile List<String> visitors = List.of();
+	/** Besucher-Name -> benötigte Items (aus dem Besucher-Menü gemerkt). */
+	public volatile Map<String, List<String>> visitorItems = new HashMap<>();
 	public volatile String nextVisitor = "";
 	public volatile String composterMatter = "";
 	public volatile String composterFuel = "";
@@ -79,6 +90,8 @@ public class GardenData {
 		if (!garden) {
 			return;
 		}
+
+		readVisitorMenu(mc);
 
 		parseTab(mc, sidebar);
 		FarmingTracker.INSTANCE.tick(mc);
@@ -233,6 +246,66 @@ public class GardenData {
 			System.out.println("[Midgard] Garden-Parsed: plot=" + currentPlot
 					+ " pests=" + pestCount + "/" + MAX_PESTS + " infested=" + infestedPlots
 					+ " visitors=" + visitors);
+		}
+	}
+
+	private int lastVisitorScreenHash = 0;
+
+	/**
+	 * Liest beim geöffneten Besucher-Menü die benötigten Items (rein lesend):
+	 * sucht das "Accept Offer"-Item und parst dessen Lore-Abschnitt "Required:".
+	 * Merkt sich pro Besucher (Menü-Titel). Best-Effort + Diagnose-Log.
+	 */
+	private void readVisitorMenu(MinecraftClient mc) {
+		Screen s = mc.currentScreen;
+		if (!(s instanceof HandledScreen<?> hs)) {
+			lastVisitorScreenHash = 0;
+			return;
+		}
+		if (s.hashCode() == lastVisitorScreenHash) {
+			return;
+		}
+		String title = s.getTitle() == null ? "" : ScoreboardReader.stripFormatting(s.getTitle().getString());
+		if (title.isEmpty()) {
+			return;
+		}
+		for (Slot slot : hs.getScreenHandler().slots) {
+			ItemStack st = slot.getStack();
+			if (st == null || st.isEmpty()) {
+				continue;
+			}
+			String name = st.getName() == null ? "" : st.getName().getString();
+			if (!name.toLowerCase(Locale.ROOT).contains("accept offer")) {
+				continue;
+			}
+			LoreComponent lore = st.get(DataComponentTypes.LORE);
+			if (lore == null) {
+				continue;
+			}
+			List<String> needed = new ArrayList<>();
+			boolean inReq = false;
+			for (Text line : lore.lines()) {
+				String l = ScoreboardReader.stripFormatting(line.getString());
+				String low = l.toLowerCase(Locale.ROOT);
+				if (low.startsWith("required") || low.startsWith("benötigt")) {
+					inReq = true;
+					continue;
+				}
+				if (inReq) {
+					if (l.isEmpty() || low.startsWith("reward") || low.startsWith("belohnung")) {
+						break;
+					}
+					needed.add(l.trim());
+				}
+			}
+			if (!needed.isEmpty()) {
+				Map<String, List<String>> copy = new HashMap<>(visitorItems);
+				copy.put(title, needed);
+				visitorItems = copy;
+				lastVisitorScreenHash = s.hashCode();
+				System.out.println("[Midgard] Besucher '" + title + "' will: " + needed);
+			}
+			break;
 		}
 	}
 

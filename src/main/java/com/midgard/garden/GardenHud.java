@@ -56,7 +56,7 @@ public final class GardenHud {
 		FarmingTracker f = FarmingTracker.INSTANCE;
 		List<HudGroup> out = new ArrayList<>();
 
-		// 1) Besucher (Namen links, Smaragd rechts).
+		// 1) Besucher: Name links, benötigte Items rechts (aus dem Menü gemerkt).
 		if (vis(cfg, KEY_VISITORS, preview)) {
 			List<String> vis = g.visitors;
 			if (preview && vis.isEmpty()) {
@@ -66,12 +66,21 @@ public final class GardenHud {
 			if (!vis.isEmpty() || !next.isEmpty()) {
 				List<HudRow> rows = new ArrayList<>();
 				for (String v : vis) {
-					rows.add(new HudRow(v, "", VALUE, List.of(Items.EMERALD), false));
+					String wants;
+					List<String> items = g.visitorItems.get(v);
+					if (items != null && !items.isEmpty()) {
+						wants = String.join(", ", items);
+					} else if (preview) {
+						wants = "32x Wheat";
+					} else {
+						wants = "? (öffnen)";
+					}
+					rows.add(new HudRow(v + ":", wants, VALUE, List.of(), false));
 				}
 				if (!next.isEmpty()) {
 					rows.add(new HudRow("Nächster", next));
 				}
-				out.add(new HudGroup(KEY_VISITORS, "Besucher", rows));
+				out.add(new HudGroup(KEY_VISITORS, "Besucher", rows, Items.EMERALD));
 			}
 		}
 
