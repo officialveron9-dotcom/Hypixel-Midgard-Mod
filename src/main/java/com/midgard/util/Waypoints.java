@@ -23,9 +23,6 @@ public final class Waypoints {
 	public record Marker(double x, double y, double z, String label, int color) {
 	}
 
-	/** Höhe der Beam-Säule in Blöcken. */
-	private static final int BEAM = 3;
-
 	private Waypoints() {
 	}
 
@@ -60,38 +57,24 @@ public final class Waypoints {
 		double focal = (h / 2.0) / Math.tan(Math.toRadians(fovDeg) / 2.0);
 
 		for (Marker m : markers) {
-			// Beam-Säule: mehrere Punkte vom Boden nach oben projizieren.
-			int[] prev = null;
-			boolean drewAny = false;
-			int topX = 0, topY = 0;
-			for (int b = 0; b <= BEAM; b++) {
-				int[] s = project(m.x() + 0.5, m.y() + b, m.z() + 0.5, eye, fwd, right, up, focal, w, h);
-				if (s != null) {
-					if (prev != null) {
-						line(context, prev[0], prev[1], s[0], s[1], m.color());
-					}
-					topX = s[0];
-					topY = s[1];
-					drewAny = true;
+			try {
+				// Auf Augenhöhe des Ziels projizieren, damit der Text gut sichtbar ist.
+				int[] s = project(m.x() + 0.5, m.y() + 1.2, m.z() + 0.5, eye, fwd, right, up, focal, w, h);
+				if (s == null || s[0] < -2000 || s[0] > w + 2000 || s[1] < -2000 || s[1] > h + 2000) {
+					continue; // hinter der Kamera oder unrealistisch weit weg
 				}
-				prev = s;
-			}
-			if (!drewAny) {
-				continue; // komplett hinter der Kamera
-			}
+				diamond(context, s[0], s[1], m.color());
 
-			int[] base = project(m.x() + 0.5, m.y(), m.z() + 0.5, eye, fwd, right, up, focal, w, h);
-			int mx = base != null ? base[0] : topX;
-			int my = base != null ? base[1] : topY;
-			diamond(context, mx, my, m.color());
-
-			double dist = Math.sqrt(sq(m.x() + 0.5 - eye.x) + sq(m.y() - eye.y) + sq(m.z() + 0.5 - eye.z));
-			String label = m.label() + " (" + Math.round(dist) + "m)";
-			int tw = textW(label);
-			int lx = Math.max(2, Math.min(w - tw - 2, topX - tw / 2));
-			int ly = topY - capH() - 6;
-			context.fill(lx - 2, ly - 2, lx + tw + 2, ly + capH() + 2, 0x90000000);
-			text(context, label, lx, ly, m.color());
+				double dist = Math.sqrt(sq(m.x() + 0.5 - eye.x) + sq(m.y() - eye.y) + sq(m.z() + 0.5 - eye.z));
+				String label = m.label() + " " + Math.round(dist) + "m";
+				int tw = textW(label);
+				int lx = Math.max(2, Math.min(w - tw - 2, s[0] - tw / 2));
+				int ly = s[1] - capH() - 5;
+				context.fill(lx - 2, ly - 2, lx + tw + 2, ly + capH() + 2, 0x90000000);
+				text(context, label, lx, ly, m.color());
+			} catch (Throwable ignored) {
+				// einzelner Marker darf nie alles abreißen
+			}
 		}
 	}
 
@@ -110,19 +93,6 @@ public final class Waypoints {
 		int sx = (int) Math.round(w / 2.0 + (rc / depth) * focal);
 		int sy = (int) Math.round(h / 2.0 - (uc / depth) * focal);
 		return new int[] { sx, sy };
-	}
-
-	private static void line(DrawContext c, int x1, int y1, int x2, int y2, int color) {
-		int steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
-		if (steps <= 0) {
-			c.fill(x1 - 1, y1 - 1, x1 + 1, y1 + 1, color);
-			return;
-		}
-		for (int i = 0; i <= steps; i++) {
-			int x = x1 + (x2 - x1) * i / steps;
-			int y = y1 + (y2 - y1) * i / steps;
-			c.fill(x - 1, y - 1, x + 1, y + 1, color);
-		}
 	}
 
 	private static void diamond(DrawContext c, int cx, int cy, int color) {

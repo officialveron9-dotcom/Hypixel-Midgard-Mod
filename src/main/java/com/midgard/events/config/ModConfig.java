@@ -63,7 +63,7 @@ public class ModConfig {
 	public boolean miningAbility = true;
 	/** Wegpunkt auf Goblins (live aus den Entities). */
 	public boolean miningGoblinWaypoints = true;
-	/** Wegpunkt zum Commission-Gebiet (Dwarven Mines, ungefähre Koordinaten). */
+	/** Wegpunkte zu den Emissären (NPCs), sobald eine Commission fertig ist. */
 	public boolean miningCommissionWaypoints = true;
 	/** Powder-Anzeige (Mithril / Gemstone / Glacite). */
 	public boolean miningPowder = true;

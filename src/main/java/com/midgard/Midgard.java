@@ -35,9 +35,18 @@ public class Midgard implements ClientModInitializer {
 
 	private int tickCounter = 0;
 
+	private static final java.util.Set<String> loggedErrors = new java.util.HashSet<>();
+
+	/** Loggt einen Render-Fehler pro Bereich nur einmal (kein Log-Spam). */
+	private static void logOnce(String area, Throwable t) {
+		if (loggedErrors.add(area)) {
+			System.err.println("[Midgard] Render-Fehler in " + area + " (abgefangen): " + t);
+		}
+	}
+
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-13d (HUD-Boxen ueberlappen nie - Auto-Aufloesung jeden Frame)");
+		System.out.println("[Midgard] init build=2026-06-13f (Crash-Schutz HUD, Mob-Cluster-Marker, Wegpunkte im Tick gecacht)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -86,11 +95,10 @@ public class Midgard implements ClientModInitializer {
 			if (!overlay || !com.midgard.bars.StatusBars.enabled()) {
 				return message;
 			}
+			// Werte auslesen, dann die Hypixel-Actionbar komplett leeren –
+			// Leben/Mana/Defense/Drill Fuel zeigen unsere eigenen Leisten + Zeile.
 			com.midgard.bars.StatusBars.onActionBar(message.getString());
-			String rest = com.midgard.bars.StatusBars.stripActionBar(message.getString());
-			return rest == null
-					? net.minecraft.text.Text.empty()
-					: net.minecraft.text.Text.literal(rest);
+			return net.minecraft.text.Text.empty();
 		});
 
 		// Pro Client-Tick: Tasten prüfen + periodisch Daten aktualisieren.
@@ -116,16 +124,30 @@ public class Midgard implements ClientModInitializer {
 				EventManager.INSTANCE.update();
 				com.midgard.garden.GardenData.INSTANCE.update(client);
 				com.midgard.mining.MiningData.INSTANCE.update(client);
+				com.midgard.mining.MiningWaypoints.tick(client);
 				com.midgard.events.event.JacobWarner.INSTANCE.tick(client);
 				com.midgard.price.PriceApi.INSTANCE.maybeRefresh();
 			}
 		});
 
-		// HUD zeichnen.
+		// HUD zeichnen. Jeder Teil eigen abgesichert – ein Fehler darf NIE das
+		// Spiel zum Absturz bringen (Crash-Schutz in den Höhlen).
 		HudRenderCallback.EVENT.register((context, tickCounter) -> {
-			EventHud.INSTANCE.render(context);
-			com.midgard.bars.StatusBars.render(context);
-			com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
+			try {
+				EventHud.INSTANCE.render(context);
+			} catch (Throwable t) {
+				logOnce("HUD", t);
+			}
+			try {
+				com.midgard.bars.StatusBars.render(context);
+			} catch (Throwable t) {
+				logOnce("Bars", t);
+			}
+			try {
+				com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
+			} catch (Throwable t) {
+				logOnce("Wegpunkte", t);
+			}
 		});
 	}
 }

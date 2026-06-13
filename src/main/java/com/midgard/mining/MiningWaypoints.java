@@ -11,77 +11,109 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 
 /**
- * Sammelt die Mining-Wegpunkte für den {@link com.midgard.util.Waypoints}-
- * Renderer. ZUVERLÄSSIG: Goblins werden live aus den Welt-Entities erkannt
- * (kein Raten). Commission-GEBIETE in den Dwarven Mines sind feste Orte – die
- * Koordinaten hier sind aber NUR ungefähr (aus dem Wiki) und müssen am echten
- * Spiel verifiziert werden; Crystal Hollows ist zufällig generiert, dort gibt
- * es keine festen Gebiets-Koordinaten.
+ * Berechnet die Mining-Wegpunkte (Goblins/Golems, Emissäre) ENTITY-basiert –
+ * zuverlässig und ohne geratene Koordinaten. WICHTIG: läuft im Tick (gecacht),
+ * NICHT pro Frame, damit volle Höhlen das Spiel nicht ausbremsen. Gleichartige
+ * Mobs werden zu EINEM Marker am ungefähren Spawn (Cluster-Mittelpunkt)
+ * zusammengefasst, statt jeden einzeln anzuzeigen.
  */
 public final class MiningWaypoints {
 
-	private static final int GOBLIN_COLOR = 0xFF5BE36B;
-	private static final int AREA_COLOR = 0xFF4DA6FF;
+	private static final int MOB_COLOR = 0xFF5BE36B;
+	private static final int EMISSARY_COLOR = 0xFFFFC85C;
+	/** Horizontaler Radius (Blöcke), innerhalb dessen Mobs zu einem Cluster gehören. */
+	private static final double CLUSTER_R = 16.0;
 
-	/** Bekannte Dwarven-Mines-Gebiete (Name-Stichwort -> ungefähre Koordinaten). */
-	private record Area(String keyword, int x, int y, int z) {
-	}
-
-	private static final List<Area> AREAS = List.of(
-			new Area("royal", 171, 150, 31),
-			new Area("cliffside", 0, 128, 50),
-			new Area("lava spring", 41, 201, -24),
-			new Area("rampart", -76, 174, -67),
-			new Area("upper mines", -100, 188, -30),
-			new Area("goblin", 30, 130, 70),
-			new Area("aristocrat", -19, 196, 50),
-			new Area("hanging court", 0, 77, 70),
-			new Area("palace", 0, 110, 120),
-			new Area("divan", 41, 154, -100));
+	private static volatile List<Marker> cached = List.of();
 
 	private MiningWaypoints() {
 	}
 
-	public static List<Marker> markers() {
-		List<Marker> out = new ArrayList<>();
-		MinecraftClient mc = MinecraftClient.getInstance();
-		if (mc.world == null || mc.player == null || Midgard.config == null
+	/** Vom Client-Tick aufgerufen (nicht pro Frame). */
+	public static void tick(MinecraftClient mc) {
+		if (mc == null || mc.world == null || mc.player == null || Midgard.config == null
 				|| !MiningData.INSTANCE.onMiningIsland) {
-			return out;
+			cached = List.of();
+			return;
 		}
 
-		// 1) Goblins live aus den Entities (zuverlässig, keine festen Koordinaten).
-		if (Midgard.config.miningGoblinWaypoints) {
-			int count = 0;
-			for (Entity e : mc.world.getEntities()) {
-				if (count >= 30) {
+		boolean mobs = Midgard.config.miningGoblinWaypoints;
+		boolean anyDone = false;
+		for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
+			if (c.done()) {
+				anyDone = true;
+				break;
+			}
+		}
+		boolean emissaries = Midgard.config.miningCommissionWaypoints && anyDone;
+		if (!mobs && !emissaries) {
+			cached = List.of();
+			return;
+		}
+
+		List<double[]> goblins = new ArrayList<>();
+		List<double[]> golems = new ArrayList<>();
+		List<Marker> out = new ArrayList<>();
+
+		int scanned = 0;
+		for (Entity e : mc.world.getEntities()) {
+			if (scanned++ > 400) {
+				break;
+			}
+			if (e.getName() == null) {
+				continue;
+			}
+			String low = e.getName().getString().toLowerCase(Locale.ROOT);
+			double[] pos = { e.getX(), e.getY(), e.getZ() };
+			if (mobs && low.contains("goblin") && !low.contains("slayer")) {
+				goblins.add(pos);
+			} else if (mobs && (low.contains("golem") || low.contains("walker"))) {
+				golems.add(pos);
+			} else if (emissaries && low.contains("emissary")) {
+				// Emissäre sind einzelne, weit verteilte NPCs -> jeder eigen.
+				out.add(new Marker(pos[0], pos[1], pos[2], e.getName().getString(), EMISSARY_COLOR));
+			}
+		}
+
+		// Mobs zu ungefähren Spawn-Markern zusammenfassen.
+		cluster(goblins, "Goblins", out);
+		cluster(golems, "Golems", out);
+		cached = out;
+	}
+
+	/** Liefert die gecachte Marker-Liste (im Render-Pfad, billig). */
+	public static List<Marker> markers() {
+		return cached;
+	}
+
+	/** Fasst nahe beieinander liegende Positionen zu Cluster-Mittelpunkten zusammen. */
+	private static void cluster(List<double[]> pts, String name, List<Marker> out) {
+		List<double[]> centers = new ArrayList<>(); // {sumX,sumY,sumZ,count}
+		for (double[] p : pts) {
+			double[] hit = null;
+			for (double[] c : centers) {
+				double cx = c[0] / c[3];
+				double cz = c[2] / c[3];
+				double dx = p[0] - cx;
+				double dz = p[2] - cz;
+				if (dx * dx + dz * dz <= CLUSTER_R * CLUSTER_R) {
+					hit = c;
 					break;
 				}
-				String name = e.getName() == null ? "" : e.getName().getString().toLowerCase(Locale.ROOT);
-				if (name.contains("goblin") && !name.contains("slayer")) {
-					out.add(new Marker(e.getX(), e.getY(), e.getZ(),
-							e.getName().getString(), GOBLIN_COLOR));
-					count++;
-				}
+			}
+			if (hit == null) {
+				centers.add(new double[] { p[0], p[1], p[2], 1 });
+			} else {
+				hit[0] += p[0];
+				hit[1] += p[1];
+				hit[2] += p[2];
+				hit[3] += 1;
 			}
 		}
-
-		// 2) Commission-Gebiet (nur Dwarven Mines, ungefähre Koordinaten).
-		if (Midgard.config.miningCommissionWaypoints) {
-			for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
-				if (c.done()) {
-					continue;
-				}
-				String low = c.name().toLowerCase(Locale.ROOT);
-				for (Area a : AREAS) {
-					if (low.contains(a.keyword())) {
-						out.add(new Marker(a.x(), a.y(), a.z(), c.name() + " (ca.)", AREA_COLOR));
-						break;
-					}
-				}
-			}
+		for (double[] c : centers) {
+			int n = (int) c[3];
+			String label = n > 1 ? name + " (" + n + ")" : name;
+			out.add(new Marker(c[0] / n, c[1] / n, c[2] / n, label, MOB_COLOR));
 		}
-
-		return out;
 	}
 }

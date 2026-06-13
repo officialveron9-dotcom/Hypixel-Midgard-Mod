@@ -396,12 +396,12 @@ public class ConfigScreen extends Screen {
 					cfg.miningPowder = !cfg.miningPowder;
 					cfg.save();
 				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Goblin-Wegpunkte",
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Mob-Wegpunkte (Goblins/Golems)",
 				() -> cfg.miningGoblinWaypoints, () -> {
 					cfg.miningGoblinWaypoints = !cfg.miningGoblinWaypoints;
 					cfg.save();
 				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Commission-Wegpunkte (ca.)",
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Emissary-Wegpunkte (bei 100%)",
 				() -> cfg.miningCommissionWaypoints, () -> {
 					cfg.miningCommissionWaypoints = !cfg.miningCommissionWaypoints;
 					cfg.save();
