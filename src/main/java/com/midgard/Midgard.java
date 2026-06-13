@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-13a (Mining-Wegpunkte: Goblins live + Commission-Gebiete)");
+		System.out.println("[Midgard] init build=2026-06-13b (Wegpunkt-Fix am Boden, Insel-Erkennung alle Gebiete, immer-sichtbar, schneller)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -109,8 +109,8 @@ public class Midgard implements ClientModInitializer {
 			// Borderless-Vollbild mit der Config abgleichen (greift sofort).
 			com.midgard.util.Borderless.tick(client);
 
-			// Etwa zweimal pro Sekunde reicht völlig.
-			if (++tickCounter >= 10) {
+			// Etwa viermal pro Sekunde – Commissions/Events erscheinen schneller.
+			if (++tickCounter >= 5) {
 				tickCounter = 0;
 				SkyblockHook.INSTANCE.update(client);
 				EventManager.INSTANCE.update();

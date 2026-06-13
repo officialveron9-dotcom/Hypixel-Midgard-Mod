@@ -48,27 +48,26 @@ public class MiningData {
 
 	private long lastDiagMs = 0;
 
+	/** Stichwörter aller Sub-Gebiete beider Mining-Inseln (Scoreboard-Fallback). */
+	private static final String[] AREA_KEYWORDS = {
+			// Dwarven Mines
+			"dwarven", "the forge", "forge", "royal palace", "palace bridge", "royal mines",
+			"gates to the mines", "upper mines", "lower mines", "cliffside", "rampart",
+			"lava springs", "springs", "aristocrat", "hanging court", "far reserve",
+			"goblin burrow", "goblin holdout", "the mist", "divan", "the lift",
+			// Crystal Hollows
+			"crystal hollows", "mithril deposit", "precursor remnant", "magma field",
+			"fairy grotto", "crystal nucleus", "khazad", "lava tube", "jungle",
+			// Glacite Mineshaft / Tunnels
+			"glacite", "mineshaft", "dwarven base camp" };
+
 	public void update(MinecraftClient mc) {
 		if (mc == null || mc.player == null || mc.getNetworkHandler() == null) {
 			onMiningIsland = false;
 			return;
 		}
-		List<String> sidebar = ScoreboardReader.sidebarLines(mc);
-		boolean mining = false;
-		for (String line : sidebar) {
-			String l = line == null ? "" : line.toLowerCase(Locale.ROOT);
-			if (l.contains("dwarven") || l.contains("crystal hollows") || l.contains("glacite")
-					|| l.contains("mines of divan")) {
-				mining = true;
-				break;
-			}
-		}
-		onMiningIsland = mining;
-		if (!mining) {
-			return;
-		}
 
-		// Tab-Liste (wie Vanilla sortiert) nach dem Commissions-Abschnitt durchsuchen.
+		// Tab-Liste (wie Vanilla sortiert) einsammeln.
 		List<PlayerListEntry> entries = new ArrayList<>(mc.getNetworkHandler().getListedPlayerListEntries());
 		entries.sort(Comparator
 				.<PlayerListEntry>comparingInt(e -> -e.getListOrder())
@@ -80,6 +79,37 @@ public class MiningData {
 			if (e.getDisplayName() != null) {
 				tab.add(ScoreboardReader.stripFormatting(e.getDisplayName().getString()));
 			}
+		}
+
+		// Insel-Erkennung: ZUVERLÄSSIG über die "Area: ..."-Zeile der Tab-Liste
+		// (bleibt in ALLEN Sub-Gebieten gleich), sonst Scoreboard-Stichwörter.
+		boolean mining = false;
+		for (String t : tab) {
+			String lt = t == null ? "" : t.toLowerCase(Locale.ROOT);
+			if (lt.startsWith("area:") && (lt.contains("dwarven mines") || lt.contains("crystal hollows")
+					|| lt.contains("glacite") || lt.contains("mineshaft"))) {
+				mining = true;
+				break;
+			}
+		}
+		if (!mining) {
+			List<String> sidebar = ScoreboardReader.sidebarLines(mc);
+			for (String line : sidebar) {
+				String l = line == null ? "" : line.toLowerCase(Locale.ROOT);
+				for (String kw : AREA_KEYWORDS) {
+					if (l.contains(kw)) {
+						mining = true;
+						break;
+					}
+				}
+				if (mining) {
+					break;
+				}
+			}
+		}
+		onMiningIsland = mining;
+		if (!mining) {
+			return;
 		}
 
 		List<Commission> coms = new ArrayList<>();
@@ -109,7 +139,8 @@ public class MiningData {
 			StringBuilder sb = new StringBuilder();
 			for (String t : tab) {
 				String lt = t.toLowerCase(Locale.ROOT);
-				if (lt.contains("commission") || lt.contains("event") || lt.contains("powder")) {
+				if (lt.startsWith("area:") || lt.contains("commission") || lt.contains("event")
+						|| lt.contains("powder")) {
 					sb.append(" | ").append(t);
 				}
 			}

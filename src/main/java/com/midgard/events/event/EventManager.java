@@ -73,14 +73,8 @@ public class EventManager {
 			}
 		}
 
-		// 1b) Mining-Event live aus dem Scoreboard (Dwarven Mines / Crystal Hollows).
-		if (cfg.isEventEnabled(EventType.MINING_EVENT)) {
-			String mining = MiningEventReader.INSTANCE.activeEvent();
-			if (mining != null) {
-				list.add(new EventDisplay(EventType.MINING_EVENT, mining, true,
-						MiningEventReader.INSTANCE.remainingSeconds()));
-			}
-		}
+		// Mining-Events werden jetzt im Mining-Modul (MiningHud) angezeigt –
+		// dort immer sichtbar (mit "inaktiv"), daher hier nicht mehr doppelt.
 
 		// 2) Live im Chat erkannte Events.
 		Map<EventType, Long> live = LiveEventTracker.INSTANCE.snapshot();

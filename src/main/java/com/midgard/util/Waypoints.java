@@ -10,16 +10,21 @@ import net.minecraft.client.render.Camera;
 import net.minecraft.util.math.Vec3d;
 
 /**
- * Bildschirm-Wegpunkte: Ein Welt-Punkt wird mit Kamera-Position, Blickrichtung
+ * Welt-Wegpunkte: Ein Boden-Punkt wird mit Kamera-Position, Blickrichtung
  * (Yaw/Pitch) und FOV per Standard-Projektion auf den Bildschirm gerechnet und
- * im HUD als Marker + Text + Entfernung gezeichnet. Bewusst rein rechnerisch
- * gelöst (kein RenderLayer/Projektionsmatrix) – robust und versionsunabhängig.
+ * als am Boden verankerter Marker mit kleiner "Beam"-Säule + Name + Entfernung
+ * gezeichnet. Rein rechnerisch (kein RenderLayer/Projektionsmatrix), damit es
+ * in 1.21.11 stabil bleibt; der Marker klebt an der Weltposition (kein
+ * Rand-Klemmen), bleibt durch Wände sichtbar (wie SkyHanni-Wegpunkte).
  */
 public final class Waypoints {
 
-	/** Ein Wegpunkt in Weltkoordinaten. */
+	/** Ein Wegpunkt: (x,y,z) = Boden-Block des Ziels. */
 	public record Marker(double x, double y, double z, String label, int color) {
 	}
+
+	/** Höhe der Beam-Säule in Blöcken. */
+	private static final int BEAM = 3;
 
 	private Waypoints() {
 	}
@@ -37,13 +42,13 @@ public final class Waypoints {
 		double yaw = Math.toRadians(cam.getYaw());
 		double pitch = Math.toRadians(cam.getPitch());
 
-		// Kamera-Basis (Standard-MC-Konvention).
+		// Kamera-Basis (rechtshändig): forward, right = forward x worldUp, up = right x forward.
 		double cy = Math.cos(yaw);
-		double sy = Math.sin(yaw);
+		double syw = Math.sin(yaw);
 		double cp = Math.cos(pitch);
 		double sp = Math.sin(pitch);
-		double[] fwd = { -sy * cp, -sp, cy * cp };
-		double[] right = { cy, 0, sy };
+		double[] fwd = { -syw * cp, -sp, cy * cp };
+		double[] right = norm(cross(fwd, new double[] { 0, 1, 0 }));
 		double[] up = cross(right, fwd);
 
 		int w = context.getScaledWindowWidth();
@@ -55,28 +60,75 @@ public final class Waypoints {
 		double focal = (h / 2.0) / Math.tan(Math.toRadians(fovDeg) / 2.0);
 
 		for (Marker m : markers) {
-			double dx = (m.x() + 0.5) - eye.x;
-			double dy = (m.y() + 0.5) - eye.y;
-			double dz = (m.z() + 0.5) - eye.z;
-			double depth = dx * fwd[0] + dy * fwd[1] + dz * fwd[2];
-			if (depth <= 0.1) {
-				continue; // hinter der Kamera
+			// Beam-Säule: mehrere Punkte vom Boden nach oben projizieren.
+			int[] prev = null;
+			boolean drewAny = false;
+			int topX = 0, topY = 0;
+			for (int b = 0; b <= BEAM; b++) {
+				int[] s = project(m.x() + 0.5, m.y() + b, m.z() + 0.5, eye, fwd, right, up, focal, w, h);
+				if (s != null) {
+					if (prev != null) {
+						line(context, prev[0], prev[1], s[0], s[1], m.color());
+					}
+					topX = s[0];
+					topY = s[1];
+					drewAny = true;
+				}
+				prev = s;
 			}
-			double rc = dx * right[0] + dy * right[1] + dz * right[2];
-			double uc = dx * up[0] + dy * up[1] + dz * up[2];
-			int sx = (int) Math.round(w / 2.0 + (rc / depth) * focal);
-			int syp = (int) Math.round(h / 2.0 - (uc / depth) * focal);
-			sx = Math.max(6, Math.min(w - 6, sx));
-			syp = Math.max(6, Math.min(h - 18, syp));
+			if (!drewAny) {
+				continue; // komplett hinter der Kamera
+			}
 
-			int dist = (int) Math.round(Math.sqrt(dx * dx + dy * dy + dz * dz));
-			String label = m.label() + " (" + dist + "m)";
+			int[] base = project(m.x() + 0.5, m.y(), m.z() + 0.5, eye, fwd, right, up, focal, w, h);
+			int mx = base != null ? base[0] : topX;
+			int my = base != null ? base[1] : topY;
+			diamond(context, mx, my, m.color());
+
+			double dist = Math.sqrt(sq(m.x() + 0.5 - eye.x) + sq(m.y() - eye.y) + sq(m.z() + 0.5 - eye.z));
+			String label = m.label() + " (" + Math.round(dist) + "m)";
 			int tw = textW(label);
-			int tx = Math.max(2, Math.min(w - tw - 2, sx - tw / 2));
+			int lx = Math.max(2, Math.min(w - tw - 2, topX - tw / 2));
+			int ly = topY - capH() - 6;
+			context.fill(lx - 2, ly - 2, lx + tw + 2, ly + capH() + 2, 0x90000000);
+			text(context, label, lx, ly, m.color());
+		}
+	}
 
-			diamond(context, sx, syp, m.color());
-			context.fill(tx - 2, syp + 6, tx + tw + 2, syp + 6 + capH() + 4, 0x90000000);
-			text(context, label, tx, syp + 8, m.color());
+	/** Welt -> Bildschirm. {x, y} oder null (hinter der Kamera). */
+	private static int[] project(double wx, double wy, double wz, Vec3d eye,
+			double[] fwd, double[] right, double[] up, double focal, int w, int h) {
+		double dx = wx - eye.x;
+		double dy = wy - eye.y;
+		double dz = wz - eye.z;
+		double depth = dx * fwd[0] + dy * fwd[1] + dz * fwd[2];
+		if (depth <= 0.1) {
+			return null;
+		}
+		double rc = dx * right[0] + dy * right[1] + dz * right[2];
+		double uc = dx * up[0] + dy * up[1] + dz * up[2];
+		int sx = (int) Math.round(w / 2.0 + (rc / depth) * focal);
+		int sy = (int) Math.round(h / 2.0 - (uc / depth) * focal);
+		return new int[] { sx, sy };
+	}
+
+	private static void line(DrawContext c, int x1, int y1, int x2, int y2, int color) {
+		int steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+		if (steps <= 0) {
+			c.fill(x1 - 1, y1 - 1, x1 + 1, y1 + 1, color);
+			return;
+		}
+		for (int i = 0; i <= steps; i++) {
+			int x = x1 + (x2 - x1) * i / steps;
+			int y = y1 + (y2 - y1) * i / steps;
+			c.fill(x - 1, y - 1, x + 1, y + 1, color);
+		}
+	}
+
+	private static void diamond(DrawContext c, int cx, int cy, int color) {
+		for (int i = 0; i <= 3; i++) {
+			c.fill(cx - (3 - i), cy - i, cx + (3 - i) + 1, cy - i + 1, color);
+			c.fill(cx - (3 - i), cy + i, cx + (3 - i) + 1, cy + i + 1, color);
 		}
 	}
 
@@ -87,11 +139,13 @@ public final class Waypoints {
 				a[0] * b[1] - a[1] * b[0] };
 	}
 
-	private static void diamond(DrawContext c, int cx, int cy, int color) {
-		for (int i = 0; i <= 3; i++) {
-			c.fill(cx - (3 - i), cy - i, cx + (3 - i) + 1, cy - i + 1, color);
-			c.fill(cx - (3 - i), cy + i, cx + (3 - i) + 1, cy + i + 1, color);
-		}
+	private static double[] norm(double[] v) {
+		double l = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+		return l == 0 ? v : new double[] { v[0] / l, v[1] / l, v[2] / l };
+	}
+
+	private static double sq(double v) {
+		return v * v;
 	}
 
 	private static void text(DrawContext c, String s, int x, int y, int color) {
