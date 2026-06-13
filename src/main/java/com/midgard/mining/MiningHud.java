@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.midgard.events.config.ModConfig;
+import com.midgard.events.hud.EventHud;
 import com.midgard.events.hud.EventHud.HudGroup;
 import com.midgard.events.hud.EventHud.HudRow;
 import com.midgard.util.TimeUtil;
@@ -21,16 +22,15 @@ public final class MiningHud {
 	public static final String KEY_COMMISSIONS = "MINING_COMMISSIONS";
 	public static final String KEY_ABILITY = "MINING_ABILITY";
 
-	private static final int WHITE = 0xFFF1F1F4;
 	private static final int GREEN = 0xFF5BE36B;
-	private static final int YELLOW = 0xFFF2C94C;
 
 	private MiningHud() {
 	}
 
 	public static List<HudGroup> groups(ModConfig cfg, boolean preview) {
 		MiningData d = MiningData.INSTANCE;
-		if (!preview && !d.onMiningIsland) {
+		// Mining-Boxen gibt es NUR auf den Mining-Inseln – auch im HUD-Editor.
+		if (!d.onMiningIsland) {
 			return List.of();
 		}
 		List<HudGroup> out = new ArrayList<>();
@@ -46,13 +46,10 @@ public final class MiningHud {
 			if (!coms.isEmpty()) {
 				List<HudRow> rows = new ArrayList<>();
 				for (MiningData.Commission c : coms) {
-					rows.add(new HudRow(List.of(),
-							c.name() + ": " + (c.done() ? "Fertig" : c.progress()),
-							c.done() ? GREEN : WHITE, c.done()));
+					rows.add(new HudRow(c.name(), c.done() ? "Fertig" : c.progress(),
+							c.done() ? GREEN : EventHud.VALUE, List.of(), c.done()));
 				}
-				rows.set(0, new HudRow(List.of(Items.IRON_PICKAXE),
-						rows.get(0).text(), rows.get(0).color(), rows.get(0).highlight()));
-				out.add(new HudGroup(KEY_COMMISSIONS, "Commissions", rows));
+				out.add(new HudGroup(KEY_COMMISSIONS, "Commissions", rows, Items.IRON_PICKAXE));
 			}
 		}
 
@@ -66,10 +63,9 @@ public final class MiningHud {
 			}
 			if (!name.isEmpty()) {
 				List<HudRow> rows = new ArrayList<>();
-				rows.add(new HudRow(List.of(Items.DIAMOND_PICKAXE), cd >= 0
-						? name + ": " + TimeUtil.format(cd)
-						: name + ": Bereit", cd >= 0 ? YELLOW : GREEN, false));
-				out.add(new HudGroup(KEY_ABILITY, "Pickaxe", rows));
+				rows.add(new HudRow(name, cd >= 0 ? TimeUtil.format(cd) : "Bereit",
+						cd >= 0 ? EventHud.VALUE : GREEN, List.of(), false));
+				out.add(new HudGroup(KEY_ABILITY, "Pickaxe", rows, Items.DIAMOND_PICKAXE));
 			}
 		}
 

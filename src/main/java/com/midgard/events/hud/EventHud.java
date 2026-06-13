@@ -47,12 +47,26 @@ public class EventHud {
 	private static final int BORDER = 0x33FFFFFF;
 	private static final int HIGHLIGHT_BG = 0x59F2772F;
 
-	/** Eine Zeile: optionale Item-Icons + Text; highlight = hervorgehoben. */
-	public record HudRow(List<Item> icons, String text, int color, boolean highlight) {
+	/** Standardfarben des einheitlichen Zeilen-Layouts. */
+	public static final int LABEL = 0xFFD6D8E0;
+	public static final int VALUE = 0xFFF2C94C;
+
+	/**
+	 * Eine Zeile im einheitlichen Layout: Beschriftung LINKS (grau/weiß),
+	 * Wert RECHTS (eine Akzentfarbe), Icons ganz rechts. Ist die Beschriftung
+	 * leer, steht der Wert links. highlight = rote Alarm-Markierung.
+	 */
+	public record HudRow(String label, String value, int valueColor, List<Item> icons, boolean highlight) {
+		public HudRow(String label, String value) {
+			this(label, value, VALUE, List.of(), false);
+		}
 	}
 
-	/** Eine HUD-Box mit Titel; key = Config-Schlüssel (Position/Größe). */
-	public record HudGroup(String key, String title, List<HudRow> rows) {
+	/** Eine HUD-Box mit Titel; key = Config-Schlüssel; icon (optional) klein oben rechts. */
+	public record HudGroup(String key, String title, List<HudRow> rows, Item icon) {
+		public HudGroup(String key, String title, List<HudRow> rows) {
+			this(key, title, rows, null);
+		}
 	}
 
 	/** Position + Maße einer HUD-Gruppe (für den HUD-Editor). */
@@ -96,8 +110,8 @@ public class EventHud {
 		for (Map.Entry<EventType, List<EventDisplay>> g : byType.entrySet()) {
 			List<HudRow> rows = new ArrayList<>();
 			for (EventDisplay d : g.getValue()) {
-				rows.add(new HudRow(rowIcons(d), TimeUtil.format(d.secondsRemaining),
-						d.active ? COLOR_ACTIVE : COLOR_UPCOMING, false));
+				rows.add(new HudRow("", TimeUtil.format(d.secondsRemaining),
+						d.active ? COLOR_ACTIVE : COLOR_UPCOMING, rowIcons(d), false));
 			}
 			out.add(new HudGroup(g.getKey().name(), g.getKey().displayName, rows));
 		}
@@ -186,18 +200,21 @@ public class EventHud {
 	}
 
 	private int rowWidth(ModConfig cfg, HudRow row) {
-		int w = row.icons().size() * iconStep(cfg);
-		if (!row.icons().isEmpty()) {
-			w += sp(4);
+		int w = textW(row.value(), fontSize(), false);
+		if (!row.label().isEmpty()) {
+			w += textW(row.label(), fontSize(), false) + sp(10);
 		}
-		return w + textW(row.text(), fontSize(), false);
+		if (!row.icons().isEmpty()) {
+			w += row.icons().size() * iconStep(cfg) + sp(4);
+		}
+		return w;
 	}
 
 	/** {frameW, titleH, groupH} – alles in skalierten Pixeln. */
 	private int[] groupMetrics(ModConfig cfg, HudGroup g) {
 		int pad = sp(PAD);
 		int titleH = capH(true);
-		int titleW = textW(g.title(), fontSize(), true);
+		int titleW = textW(g.title(), fontSize(), true) + (g.icon() != null ? sp(15) : 0);
 		int rowsW = 0;
 		int rowsH = 0;
 		for (HudRow row : g.rows()) {
@@ -257,6 +274,17 @@ public class EventHud {
 
 		outlined(context, g.title(), ox + pad, oy + pad, fs, COLOR_HEADER, true);
 
+		// Kleines Gruppen-Icon oben rechts neben dem Titel.
+		if (g.icon() != null) {
+			int isz = Math.max(8, sp(11));
+			Matrix3x2fStack mt = context.getMatrices();
+			mt.pushMatrix();
+			mt.translate(ox + frameW - pad - isz, oy + pad - sp(2));
+			mt.scale(isz / 16f, isz / 16f);
+			context.drawItem(new ItemStack(g.icon()), 0, 0);
+			mt.popMatrix();
+		}
+
 		int y = oy + pad + titleH + sp(2);
 		for (HudRow row : g.rows()) {
 			drawRow(context, cfg, row, ox + pad, y, fs, frameW - pad * 2);
@@ -270,23 +298,36 @@ public class EventHud {
 			// Hervorgehobene Zeile (z. B. Schädling auf dem aktuellen Plot).
 			UIRenderer.fillRoundedRect(context, x - sp(3), rowTop, innerW + sp(6), rh, sp(4), HIGHLIGHT_BG);
 		}
-		int size = iconSize(cfg);
-		float iconScale = size / 16f;
 		int mid = rowTop + rh / 2;
-		int cursor = x;
-		Matrix3x2fStack m = context.getMatrices();
-		for (Item item : row.icons()) {
-			m.pushMatrix();
-			m.translate(cursor, mid - size / 2);
-			m.scale(iconScale, iconScale);
-			context.drawItem(new ItemStack(item), 0, 0);
-			m.popMatrix();
-			cursor += iconStep(cfg);
-		}
-		if (!row.icons().isEmpty()) {
-			cursor += sp(4);
-		}
 		int yTop = mid - capH(false) / 2;
-		outlined(context, row.text(), cursor, yTop, fs, row.color(), false);
+
+		// Icons GANZ RECHTS.
+		int right = x + innerW;
+		if (!row.icons().isEmpty()) {
+			int size = iconSize(cfg);
+			float iconScale = size / 16f;
+			int iconsW = row.icons().size() * iconStep(cfg);
+			int cursor = right - iconsW;
+			Matrix3x2fStack m = context.getMatrices();
+			for (Item item : row.icons()) {
+				m.pushMatrix();
+				m.translate(cursor, mid - size / 2);
+				m.scale(iconScale, iconScale);
+				context.drawItem(new ItemStack(item), 0, 0);
+				m.popMatrix();
+				cursor += iconStep(cfg);
+			}
+			right -= iconsW + sp(4);
+		}
+
+		if (row.label().isEmpty()) {
+			// Nur ein Wert: links, in der Wert-Farbe.
+			outlined(context, row.value(), x, yTop, fs, row.valueColor(), false);
+		} else {
+			// Beschriftung links (grau/weiß), Wert rechtsbündig in der Akzentfarbe.
+			outlined(context, row.label(), x, yTop, fs, LABEL, false);
+			int vw = textW(row.value(), fs, false);
+			outlined(context, row.value(), right - vw, yTop, fs, row.valueColor(), false);
+		}
 	}
 }

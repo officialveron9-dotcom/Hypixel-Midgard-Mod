@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12p (Hover-Vorschau im Auktion-Tab, Text ohne Sonderzeichen)");
+		System.out.println("[Midgard] init build=2026-06-12q (Gebiets-Filter, einheitl. Zeilen, Icon rechts, schlanker Editor, Actionbar-Dedupe)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -76,6 +76,21 @@ public class Midgard implements ClientModInitializer {
 				// Actionbar: Hypixel zeigt dort Leben/Mana (für die eigenen Leisten).
 				com.midgard.bars.StatusBars.onActionBar(message.getString());
 			}
+		});
+
+		// Actionbar kürzen: Leben/Mana zeigen schon unsere eigenen Leisten -
+		// damit nichts doppelt steht, aus dem Overlay-Text entfernen (Defense,
+		// Drill Fuel u. a. bleiben). MODIFY_GAME läuft VOR GAME, daher hier auch
+		// gleich die Werte für die Leisten auslesen. Nur bei aktiven Leisten.
+		ClientReceiveMessageEvents.MODIFY_GAME.register((message, overlay) -> {
+			if (!overlay || !com.midgard.bars.StatusBars.enabled()) {
+				return message;
+			}
+			com.midgard.bars.StatusBars.onActionBar(message.getString());
+			String rest = com.midgard.bars.StatusBars.stripActionBar(message.getString());
+			return rest == null
+					? net.minecraft.text.Text.empty()
+					: net.minecraft.text.Text.literal(rest);
 		});
 
 		// Pro Client-Tick: Tasten prüfen + periodisch Daten aktualisieren.

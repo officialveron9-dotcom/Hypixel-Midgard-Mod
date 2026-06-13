@@ -65,6 +65,20 @@ public final class StatusBars {
 		}
 	}
 
+	/**
+	 * Entfernt die von unseren Leisten bereits angezeigten Teile (Leben, Mana)
+	 * aus der Actionbar, damit nichts doppelt steht. Rest (Defense, Drill Fuel,
+	 * Skill-XP ...) bleibt erhalten. Liefert null, wenn nichts übrig bleibt.
+	 */
+	public static String stripActionBar(String message) {
+		String s = message
+				.replaceAll("[❤♥]?\\s*[\\d.,]+/[\\d.,]+[❤♥]", "")
+				.replaceAll("[\\d.,]+/[\\d.,]+✎\\s*(Mana)?", "")
+				.replaceAll("\\s{2,}", "   ")
+				.trim();
+		return s.isEmpty() ? null : s;
+	}
+
 	private static long parse(String s) {
 		try {
 			return Long.parseLong(s.replace(",", "").replace(".", ""));

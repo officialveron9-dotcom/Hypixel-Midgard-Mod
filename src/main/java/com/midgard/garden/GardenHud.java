@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.midgard.events.config.ModConfig;
 import com.midgard.events.event.EventIcons;
+import com.midgard.events.hud.EventHud;
 import com.midgard.events.hud.EventHud.HudGroup;
 import com.midgard.events.hud.EventHud.HudRow;
 import com.midgard.util.TimeUtil;
@@ -13,10 +14,10 @@ import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 
 /**
- * Baut die Garden-HUD-Gruppen (Besucher, Schädlinge, Werkzeug, Farming-Statistik,
- * Collection) aus {@link GardenData} + {@link FarmingTracker}. Jede Gruppe ist
- * einzeln schaltbar und im HUD-Editor einzeln verschieb-/skalierbar. Im
- * Editor-Preview werden Beispieldaten gezeigt, damit man alles anordnen kann.
+ * Baut die Garden-HUD-Gruppen aus {@link GardenData} + {@link FarmingTracker}.
+ * Einheitliches Zeilen-Layout: Beschriftung links (grau), Wert rechts in der
+ * Akzentfarbe, Icons ganz rechts; Alarm-Zeilen rot. Nur im Garten sichtbar
+ * (auch im HUD-Editor); im Editor-Preview Beispieldaten, falls echte fehlen.
  */
 public final class GardenHud {
 
@@ -28,16 +29,12 @@ public final class GardenHud {
 	public static final String KEY_COMPOSTER = "GARDEN_COMPOSTER";
 	public static final String KEY_JACOB = "GARDEN_JACOB";
 
+	private static final int VALUE = EventHud.VALUE;
+	private static final int RED = 0xFFFF5A52;
+
 	/** Medaillen-Stufen beim Jacob-Contest (Top-Prozent). */
 	private static final int[] BRACKET_PCT = { 2, 5, 10, 30, 60 };
 	private static final String[] BRACKET_NAME = { "Diamant", "Platin", "Gold", "Silber", "Bronze" };
-
-	private static final int WHITE = 0xFFF1F1F4;
-	private static final int GREEN = 0xFF5BE36B;
-	private static final int YELLOW = 0xFFF2C94C;
-	private static final int RED = 0xFFFF5A52;
-	private static final int GOLD = 0xFFFFC85C;
-	private static final int DIM = 0xFF9A9AA5;
 
 	private static final String[] ROMAN = {
 			"0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X" };
@@ -47,13 +44,14 @@ public final class GardenHud {
 
 	public static List<HudGroup> groups(ModConfig cfg, boolean preview) {
 		GardenData g = GardenData.INSTANCE;
-		if (!preview && !g.onGarden) {
+		// Garden-Boxen gibt es NUR im Garten – auch im HUD-Editor.
+		if (!g.onGarden) {
 			return List.of();
 		}
 		FarmingTracker f = FarmingTracker.INSTANCE;
 		List<HudGroup> out = new ArrayList<>();
 
-		// 1) Besucher.
+		// 1) Besucher (Namen links, Smaragd rechts).
 		if (cfg.gardenVisitors) {
 			List<String> vis = g.visitors;
 			if (preview && vis.isEmpty()) {
@@ -63,16 +61,16 @@ public final class GardenHud {
 			if (!vis.isEmpty() || !next.isEmpty()) {
 				List<HudRow> rows = new ArrayList<>();
 				for (String v : vis) {
-					rows.add(new HudRow(List.of(Items.EMERALD), v, WHITE, false));
+					rows.add(new HudRow(v, "", VALUE, List.of(Items.EMERALD), false));
 				}
 				if (!next.isEmpty()) {
-					rows.add(new HudRow(List.of(), "Nächster: " + next, YELLOW, false));
+					rows.add(new HudRow("Nächster", next));
 				}
 				out.add(new HudGroup(KEY_VISITORS, "Besucher", rows));
 			}
 		}
 
-		// 2) Schädlinge: Anzahl + befallene Plots; aktueller Plot hervorgehoben.
+		// 2) Schädlinge: Anzahl + befallene Plots; aktueller Plot rot.
 		if (cfg.gardenPests) {
 			int count = g.pestCount;
 			List<String> plots = g.infestedPlots;
@@ -82,27 +80,24 @@ public final class GardenHud {
 				plots = List.of("2", "5");
 			}
 			List<HudRow> rows = new ArrayList<>();
-			rows.add(new HudRow(List.of(Items.SPIDER_EYE), count + "/" + GardenData.MAX_PESTS,
-					count > 0 ? YELLOW : GREEN, false));
+			rows.add(new HudRow("Anzahl", count + "/" + GardenData.MAX_PESTS));
 			for (String p : plots) {
 				boolean here = sample ? p.equals("2") : g.isCurrentPlot(p);
-				rows.add(new HudRow(List.of(), "Plot " + p, here ? RED : YELLOW, here));
+				rows.add(new HudRow("", "Plot " + p, here ? RED : VALUE, List.of(), here));
 			}
 			long cd = g.handinCooldownRemaining();
 			if (preview && cd < 0) {
 				cd = 43 * 60;
 			}
 			if (cd >= 0) {
-				rows.add(new HudRow(List.of(), "Abgabe in " + TimeUtil.format(cd), DIM, false));
+				rows.add(new HudRow("Abgabe in", TimeUtil.format(cd)));
 			} else if (g.pestHandinMs > 0) {
-				rows.add(new HudRow(List.of(), "Abgabe bereit", GREEN, false));
+				rows.add(new HudRow("Abgabe", "bereit"));
 			}
-			out.add(new HudGroup(KEY_PESTS, "Schädlinge", rows));
+			out.add(new HudGroup(KEY_PESTS, "Schädlinge", rows, Items.SPIDER_EYE));
 		}
 
-		// 3-5) EINE kombinierte Farming-Box (wie bei Taunahi): Cultivating,
-		// Crops/min, Coins/h, Blöcke/s, Optimal-Speed, Milestone, Yaw/Pitch.
-		// Sichtbar mit Farm-Werkzeug in der Hand oder beim aktiven Farmen.
+		// 3-5) EINE kombinierte Farming-Box: Cultivating, Raten, Milestone, Yaw/Pitch.
 		if ((cfg.gardenTool || cfg.gardenStats || cfg.gardenCollection)
 				&& (preview || f.farming() || f.holdingFarmTool())) {
 			String crop = f.crop().isEmpty() ? (preview ? "Wheat" : "") : f.crop();
@@ -113,8 +108,7 @@ public final class GardenHud {
 				if (cult >= 0) {
 					int lvl = f.cultivatingLevel();
 					String lvlTxt = f.cultivating >= 0 ? " (" + ROMAN[Math.min(lvl, 10)] + ")" : " (IX)";
-					rows.add(new HudRow(List.of(Items.IRON_HOE),
-							"Cultivating: " + full(cult) + lvlTxt, WHITE, false));
+					rows.add(new HudRow("Cultivating", num(cult) + lvlTxt));
 				}
 			}
 
@@ -125,19 +119,18 @@ public final class GardenHud {
 					cpm = 52_440;
 					bps = 20.0;
 				}
-				rows.add(new HudRow(List.of(), "Crops/min: " + full(Math.round(cpm)), GREEN, false));
+				rows.add(new HudRow("Crops/min", num(Math.round(cpm))));
 				double sell = bazaarSell(crop);
 				if (preview && sell <= 0) {
 					sell = 4.2;
 				}
 				if (sell > 0 && cpm > 0) {
-					rows.add(new HudRow(List.of(),
-							"Coins/h: " + full(Math.round(cpm * 60 * sell)) + " (Bazaar)", GOLD, false));
+					rows.add(new HudRow("Coins/h", num(Math.round(cpm * 60 * sell))));
 				}
-				rows.add(new HudRow(List.of(), String.format("Blöcke/s: %.1f", bps), WHITE, false));
+				rows.add(new HudRow("Blöcke/s", String.format("%.1f", bps)));
 				int speed = optimalSpeed(crop);
 				if (speed > 0) {
-					rows.add(new HudRow(List.of(), "Optimal: " + speed + " Speed", DIM, false));
+					rows.add(new HudRow("Optimal", speed + " Speed"));
 				}
 			}
 
@@ -146,16 +139,15 @@ public final class GardenHud {
 				if (col != null) {
 					long est = f.collectionEstimate(col);
 					long eta = f.collectionEtaSeconds(col);
-					rows.add(new HudRow(List.of(), "Milestone: " + num(est) + " / " + num(col.target()),
-							WHITE, false));
+					rows.add(new HudRow("Milestone", num(est) + " / " + num(col.target())));
 					if (eta >= 0) {
-						rows.add(new HudRow(List.of(), "Rang in " + TimeUtil.format(eta), GREEN, false));
+						rows.add(new HudRow("Rang in", TimeUtil.format(eta)));
 					}
 				} else if (preview) {
-					rows.add(new HudRow(List.of(), "Milestone: 84,3k / 100k", WHITE, false));
-					rows.add(new HudRow(List.of(), "Rang in 1h 12m", GREEN, false));
+					rows.add(new HudRow("Milestone", "84,3k / 100k"));
+					rows.add(new HudRow("Rang in", "1h 12m"));
 				} else {
-					rows.add(new HudRow(List.of(), "Milestone-Menü 1x öffnen", YELLOW, false));
+					rows.add(new HudRow("Milestone", "Menü 1x öffnen"));
 				}
 			}
 
@@ -164,19 +156,18 @@ public final class GardenHud {
 						net.minecraft.client.MinecraftClient.getInstance().player;
 				if (p != null) {
 					float yaw = net.minecraft.util.math.MathHelper.wrapDegrees(p.getYaw());
-					rows.add(new HudRow(List.of(), String.format("Yaw: %.2f", yaw), DIM, false));
-					rows.add(new HudRow(List.of(), String.format("Pitch: %.2f", p.getPitch()), DIM, false));
+					rows.add(new HudRow("Yaw", String.format("%.2f", yaw)));
+					rows.add(new HudRow("Pitch", String.format("%.2f", p.getPitch())));
 				}
 			}
 
 			if (!rows.isEmpty()) {
 				Item icon = crop.isEmpty() ? Items.IRON_HOE : EventIcons.forCrop(crop);
-				rows.set(0, new HudRow(List.of(icon), rows.get(0).text(), rows.get(0).color(), false));
-				out.add(new HudGroup(KEY_STATS, crop.isEmpty() ? "Farming" : "Farming – " + crop, rows));
+				out.add(new HudGroup(KEY_STATS, crop.isEmpty() ? "Farming" : crop, rows, icon));
 			}
 		}
 
-		// 6) Composter: Material/Brennstoff/Restzeit, Warnung wenn leer.
+		// 6) Composter: Warnung (rot) wenn leer.
 		if (cfg.gardenComposter) {
 			String matter = preview && g.composterMatter.isEmpty() ? "43,2k" : g.composterMatter;
 			String fuel = preview && g.composterFuel.isEmpty() ? "0" : g.composterFuel;
@@ -184,21 +175,21 @@ public final class GardenHud {
 			if (!matter.isEmpty() || !fuel.isEmpty()) {
 				List<HudRow> rows = new ArrayList<>();
 				if (!matter.isEmpty()) {
-					rows.add(new HudRow(List.of(), "Material: " + matter,
-							empty(matter) ? RED : WHITE, empty(matter)));
+					rows.add(new HudRow("Material", matter, empty(matter) ? RED : VALUE,
+							List.of(), empty(matter)));
 				}
 				if (!fuel.isEmpty()) {
-					rows.add(new HudRow(List.of(), "Brennstoff: " + fuel,
-							empty(fuel) ? RED : WHITE, empty(fuel)));
+					rows.add(new HudRow("Brennstoff", fuel, empty(fuel) ? RED : VALUE,
+							List.of(), empty(fuel)));
 				}
 				if (!time.isEmpty()) {
-					rows.add(new HudRow(List.of(), "Fertig in: " + time, GREEN, false));
+					rows.add(new HudRow("Fertig in", time));
 				}
 				out.add(new HudGroup(KEY_COMPOSTER, "Composter", rows));
 			}
 		}
 
-		// 7) Jacob-Contest live: gesammelt, Platzierung, nächste Medaille, Ende.
+		// 7) Jacob-Contest live.
 		if (cfg.gardenJacob) {
 			long collected = g.jacobCollected;
 			int pct = g.jacobPercent;
@@ -209,16 +200,14 @@ public final class GardenHud {
 			if (collected >= 0 || pct >= 0) {
 				List<HudRow> rows = new ArrayList<>();
 				if (collected >= 0) {
-					rows.add(new HudRow(List.of(), "Gesammelt: " + num(collected), WHITE, false));
+					rows.add(new HudRow("Gesammelt", num(collected)));
 				}
 				int bracket = bracketOf(pct);
 				if (pct >= 0) {
-					rows.add(new HudRow(List.of(), "Top " + pct + "%  (" + BRACKET_NAME[bracket] + ")",
-							GREEN, false));
+					rows.add(new HudRow("Platz", "Top " + pct + "% (" + BRACKET_NAME[bracket] + ")"));
 					if (bracket > 0) {
-						rows.add(new HudRow(List.of(),
-								"Nächste: Top " + BRACKET_PCT[bracket - 1] + "% (" + BRACKET_NAME[bracket - 1] + ")",
-								YELLOW, false));
+						rows.add(new HudRow("Nächste",
+								"Top " + BRACKET_PCT[bracket - 1] + "% (" + BRACKET_NAME[bracket - 1] + ")"));
 					}
 				}
 				java.util.Map.Entry<Long, java.util.List<String>> act =
@@ -226,9 +215,9 @@ public final class GardenHud {
 				if (act != null) {
 					long ends = act.getKey() + com.midgard.price.PriceApi.CONTEST_SECONDS
 							- System.currentTimeMillis() / 1000;
-					rows.add(new HudRow(List.of(), "Endet in " + TimeUtil.format(ends), YELLOW, false));
+					rows.add(new HudRow("Endet in", TimeUtil.format(ends)));
 				} else if (preview) {
-					rows.add(new HudRow(List.of(), "Endet in 12m 20s", YELLOW, false));
+					rows.add(new HudRow("Endet in", "12m 20s"));
 				}
 				out.add(new HudGroup(KEY_JACOB, "Jacob Live", rows));
 			}
@@ -287,10 +276,6 @@ public final class GardenHud {
 	}
 
 	/** Zahlenanzeige: voll oder gekürzt – zentral in Numbers (Auktion-Tab). */
-	private static String full(long v) {
-		return com.midgard.util.Numbers.format(v);
-	}
-
 	private static String num(long v) {
 		return com.midgard.util.Numbers.format(v);
 	}

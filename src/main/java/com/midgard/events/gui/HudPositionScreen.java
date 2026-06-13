@@ -137,71 +137,21 @@ public class HudPositionScreen extends Screen {
 		return null;
 	}
 
-	// ---- Unteres Panel ------------------------------------------------------
+	// ---- Unten: nur ein Fertig-Button ---------------------------------------
 
 	private void drawPanel(DrawContext context, int mouseX, int mouseY) {
-		boolean sel = selected != null;
-		panelW = sel ? 460 : 430;
-		panelH = sel ? 76 : 48;
+		panelW = 88;
+		panelH = 22;
 		panelX = (this.width - panelW) / 2;
-		panelY = this.height - panelH - 14;
+		panelY = this.height - panelH - 12;
 
+		boolean hover = mouseX >= panelX && mouseX <= panelX + panelW
+				&& mouseY >= panelY && mouseY <= panelY + panelH;
 		sprite(context, panelX - 1, panelY - 1, panelW + 2, panelH + 2, BORDER);
-		sprite(context, panelX, panelY, panelW, panelH, PANEL);
-
-		int pad = 14;
-		txt(context, "HUD bearbeiten", panelX + pad, panelY + 9, TEXT, true);
-
-		int bw = 66;
-		int bh = 18;
-		int bx = panelX + panelW - pad - bw;
-		int by = panelY + 7;
-		sprite(context, bx, by, bw, bh, ACCENT);
-		txt(context, "Fertig", bx + (bw - txtW("Fertig", true)) / 2, by + (bh - capH() + 1) / 2, 0xFF15151A, true);
-		clickables.add(new Clickable(bx, by, bx + bw, by + bh, this::close));
-
-		String hint = sel
-				? "Ziehen: verschieben  -  Mausrad: Größe  -  daneben klicken: abwählen"
-				: "Element anklicken zum Bearbeiten  -  ESC schließt";
-		txt(context, hint, panelX + pad, panelY + 28, TEXT_DIM, false);
-
-		if (!sel) {
-			return;
-		}
-
-		// Zweite Zeile: Name + Größen-Buttons für das ausgewählte Element.
-		int rowY = panelY + 47;
-		int btnH = 18;
-		String name = selectedTitle;
-		txt(context, name, panelX + pad, rowY + (btnH - capH()) / 2, ACCENT, true);
-
-		int x = panelX + pad + Math.max(110, txtW(name, true) + 14);
-		x = button(context, x, rowY, 20, btnH, "-", () -> resize(-0.1f));
-		String pct = Math.round(cfg.groupScale(selected) * 100) + "%";
-		int pctW = Math.max(38, txtW(pct, true) + 6);
-		txt(context, pct, x + (pctW - txtW(pct, true)) / 2, rowY + (btnH - capH()) / 2, TEXT, true);
-		x += pctW;
-		x = button(context, x, rowY, 20, btnH, "+", () -> resize(+0.1f));
-		x += 8;
-		x = button(context, x, rowY, txtW("Standardgröße", false) + 14, btnH, "Standardgröße", () -> {
-			cfg.setGroupScale(selected, 1f);
-			cfg.save();
-		});
-		x += 6;
-		if (cfg.hasGroupPos(selected)) {
-			button(context, x, rowY, txtW("Andocken", false) + 14, btnH, "Andocken", () -> {
-				cfg.clearGroupPos(selected);
-				cfg.save();
-			});
-		}
-	}
-
-	/** Kleiner Button; liefert die X-Position hinter dem Button zurück. */
-	private int button(DrawContext c, int x, int y, int w, int h, String label, Runnable action) {
-		sprite(c, x, y, w, h, BTN_BG);
-		txt(c, label, x + (w - txtW(label, false)) / 2, y + (h - capH() + 1) / 2, TEXT, false);
-		clickables.add(new Clickable(x, y, x + w, y + h, action));
-		return x + w;
+		sprite(context, panelX, panelY, panelW, panelH, hover ? 0xFFFF8A45 : ACCENT);
+		txt(context, "Fertig", panelX + (panelW - txtW("Fertig", true)) / 2,
+				panelY + (panelH - capH() + 1) / 2, 0xFF15151A, true);
+		clickables.add(new Clickable(panelX, panelY, panelX + panelW, panelY + panelH, this::close));
 	}
 
 	private void resize(float delta) {
@@ -253,6 +203,14 @@ public class HudPositionScreen extends Screen {
 		if (r != null) {
 			selected = r.key();
 			selectedTitle = r.title();
+			if (doubled) {
+				// Doppelklick: Standardgröße + zurück in den Stapel.
+				cfg.setGroupScale(selected, 1f);
+				cfg.clearGroupPos(selected);
+				cfg.save();
+				dragging = false;
+				return true;
+			}
 			dragging = true;
 			dragMoved = false;
 			dragOffsetX = (int) (mx - r.x());
