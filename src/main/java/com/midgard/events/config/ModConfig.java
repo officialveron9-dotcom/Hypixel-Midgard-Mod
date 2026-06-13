@@ -61,6 +61,10 @@ public class ModConfig {
 	public boolean miningCommissions = true;
 	/** Pickaxe-Ability-Cooldown (Pickobulus, Mining Speed Boost ...). */
 	public boolean miningAbility = true;
+	/** Wegpunkt auf Goblins (live aus den Entities). */
+	public boolean miningGoblinWaypoints = true;
+	/** Wegpunkt zum Commission-Gebiet (Dwarven Mines, ungefähre Koordinaten). */
+	public boolean miningCommissionWaypoints = true;
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 

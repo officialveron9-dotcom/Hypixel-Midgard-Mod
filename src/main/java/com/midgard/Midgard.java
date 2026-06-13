@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-12q (Gebiets-Filter, einheitl. Zeilen, Icon rechts, schlanker Editor, Actionbar-Dedupe)");
+		System.out.println("[Midgard] init build=2026-06-13a (Mining-Wegpunkte: Goblins live + Commission-Gebiete)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -125,6 +125,7 @@ public class Midgard implements ClientModInitializer {
 		HudRenderCallback.EVENT.register((context, tickCounter) -> {
 			EventHud.INSTANCE.render(context);
 			com.midgard.bars.StatusBars.render(context);
+			com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
 		});
 	}
 }

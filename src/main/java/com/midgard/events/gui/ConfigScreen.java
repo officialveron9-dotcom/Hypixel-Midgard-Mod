@@ -391,6 +391,16 @@ public class ConfigScreen extends Screen {
 					cfg.setEventEnabled(EventType.MINING_EVENT, !cfg.isEventEnabled(EventType.MINING_EVENT));
 					cfg.save();
 				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Goblin-Wegpunkte",
+				() -> cfg.miningGoblinWaypoints, () -> {
+					cfg.miningGoblinWaypoints = !cfg.miningGoblinWaypoints;
+					cfg.save();
+				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Commission-Wegpunkte (ca.)",
+				() -> cfg.miningCommissionWaypoints, () -> {
+					cfg.miningCommissionWaypoints = !cfg.miningCommissionWaypoints;
+					cfg.save();
+				}));
 	}
 
 	/** Kompakte Schalter-Zeile ohne Icon (Garden-Tab). */
