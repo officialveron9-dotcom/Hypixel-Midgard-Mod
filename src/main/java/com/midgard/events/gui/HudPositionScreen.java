@@ -65,7 +65,11 @@ public class HudPositionScreen extends Screen {
 	// ---- Gruppen / Layout des aktuellen Standorts -------------------------
 
 	private List<HudGroup> editable() {
-		return EventHud.INSTANCE.editorGroups(cfg, activeLoc);
+		// Nur AKTIVIERTE Elemente werden gezeichnet – deaktivierte verschwinden
+		// komplett und tauchen beim Einschalten an freier Position wieder auf.
+		List<HudGroup> g = new ArrayList<>(EventHud.INSTANCE.editorGroups(cfg, activeLoc));
+		g.removeIf(x -> !cfg.isElementEnabled(x.key()));
+		return g;
 	}
 
 	private List<HudGroup> ghosts() {
@@ -162,9 +166,6 @@ public class HudPositionScreen extends Screen {
 			}
 		}
 
-		// Kopfzeile mit Standortnamen.
-		txtScaled(context, activeLoc.label + " bearbeiten", 14, 12, TEXT, true, 1.6f);
-
 		drawElementList(context, mouseX, mouseY);
 	}
 
@@ -206,13 +207,24 @@ public class HudPositionScreen extends Screen {
 			}));
 			txt(context, el.name(), cx + cb + 8, ry + (rowH - capH()) / 2, on ? TEXT : TEXT_DIM, false);
 
+			int bs = 16;
+			int by = ry + (rowH - bs) / 2;
 			int rightX = x + w - 10;
+
+			// Größe-zurücksetzen-Knopf (ganz rechts).
+			int resetX = rightX - bs;
+			boolean rh = mouseX >= resetX && mouseX <= resetX + bs && mouseY >= by && mouseY <= by + bs;
+			sprite(context, resetX, by, bs, bs, rh ? CARD_HOVER : CARD);
+			resetIcon(context, resetX + bs / 2, by + bs / 2, rh ? TEXT : TEXT_DIM);
+			clickables.add(new Clickable(resetX, by, resetX + bs, by + bs, () -> {
+				cfg.setGroupScale(el.key(), 1f);
+				cfg.save();
+			}));
+			rightX = resetX - 4;
 
 			// Anzahl-Stepper für Events, die "kommende" unterstützen.
 			EventType ev = eventOf(el.key());
 			if (ev != null && supportsUpcoming(ev)) {
-				int bs = 14;
-				int by = ry + (rowH - bs) / 2;
 				int plusX = rightX - bs;
 				int n = cfg.getUpcomingEvent(ev);
 				String num = String.valueOf(n);
@@ -233,14 +245,16 @@ public class HudPositionScreen extends Screen {
 					cfg.save();
 				}));
 			} else if (!global) {
-				// M/W: nur hier / überall.
+				// nur hier (Pin) / überall (Globus) – als Icon.
 				boolean gl = cfg.isElementGlobal(el.key());
-				int bs = 16;
 				int bx = rightX - bs;
-				int by = ry + (rowH - bs) / 2;
 				boolean hov = mouseX >= bx && mouseX <= bx + bs && mouseY >= by && mouseY <= by + bs;
 				sprite(context, bx, by, bs, bs, hov ? CARD_HOVER : CARD);
-				txtC(context, gl ? "W" : "M", bx + bs / 2, by, bs, gl ? ACCENT : TEXT_DIM, true);
+				if (gl) {
+					globeIcon(context, bx + bs / 2, by + bs / 2, ACCENT);
+				} else {
+					pinIcon(context, bx + bs / 2, by + bs / 2, TEXT_DIM);
+				}
 				clickables.add(new Clickable(bx, by, bx + bs, by + bs, () -> {
 					cfg.setElementGlobal(el.key(), !cfg.isElementGlobal(el.key()));
 					cfg.save();
@@ -251,8 +265,8 @@ public class HudPositionScreen extends Screen {
 
 		// Kompakte Legende unten in der Liste.
 		String legend = global
-				? "+/- = Anzahl kommender · Ziehen = verschieben · Mausrad = Größe"
-				: "M/W = nur hier / überall · Ziehen = verschieben · Mausrad = Größe";
+				? "Haken = an/aus · +/- = Anzahl · Kreis = Größe zurück · Rad = Größe"
+				: "Haken = an/aus · Pin/Globus = nur hier/überall · Kreis = Größe zurück";
 		txt(context, legend, x + 12, ry + 8, TEXT_DIM, false);
 	}
 
@@ -276,10 +290,66 @@ public class HudPositionScreen extends Screen {
 
 	// ---- Zeichen-Hilfen ---------------------------------------------------
 
+	/** Echter Haken (zwei Diagonalen) statt grünem Quadrat. */
 	private void check(DrawContext c, int x, int y, int size, int color) {
-		int m = size / 2;
-		c.fill(x + 3, y + m, x + 5, y + size - 2, color);
-		c.fill(x + 4, y + size - 4, x + size - 2, y + 3, color);
+		int ax = x + 2, ay = y + size / 2 + 1;
+		int bx = x + size / 2 - 1, by = y + size - 3;
+		int cx = x + size - 2, cy = y + 2;
+		seg(c, ax, ay, bx, by, color);
+		seg(c, bx, by, cx, cy, color);
+	}
+
+	/** Plottet eine 2px-Linie zwischen zwei Punkten. */
+	private void seg(DrawContext c, int x1, int y1, int x2, int y2, int color) {
+		int steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+		for (int i = 0; i <= steps; i++) {
+			int px = x1 + (x2 - x1) * i / Math.max(1, steps);
+			int py = y1 + (y2 - y1) * i / Math.max(1, steps);
+			c.fill(px, py, px + 2, py + 2, color);
+		}
+	}
+
+	/** Ring (Kreis-Umriss) per plotted Punkten. */
+	private void ring(DrawContext c, int cx, int cy, int r, int color) {
+		int n = Math.max(12, r * 4);
+		for (int i = 0; i < n; i++) {
+			double a = i * (Math.PI * 2) / n;
+			int px = cx + (int) Math.round(r * Math.cos(a));
+			int py = cy + (int) Math.round(r * Math.sin(a));
+			c.fill(px, py, px + 1, py + 1, color);
+		}
+	}
+
+	/** "Nur hier" = Standort-Pin. */
+	private void pinIcon(DrawContext c, int cx, int cy, int color) {
+		ring(c, cx, cy - 2, 3, color);
+		c.fill(cx, cy - 2, cx + 1, cy - 1, color); // Punkt in der Mitte
+		seg(c, cx - 2, cy, cx, cy + 4, color); // Spitze
+		seg(c, cx + 2, cy, cx, cy + 4, color);
+	}
+
+	/** "Überall" = Globus (Ring + Meridiane). */
+	private void globeIcon(DrawContext c, int cx, int cy, int color) {
+		ring(c, cx, cy, 5, color);
+		c.fill(cx, cy - 5, cx + 1, cy + 5, color); // vertikal
+		c.fill(cx - 5, cy, cx + 5, cy + 1, color); // horizontal
+		c.fill(cx - 3, cy - 3, cx + 4, cy - 2, color); // obere Breite
+		c.fill(cx - 3, cy + 3, cx + 4, cy + 4, color); // untere Breite
+	}
+
+	/** Reset = Kreis-Pfeil. */
+	private void resetIcon(DrawContext c, int cx, int cy, int color) {
+		int r = 4;
+		int n = 20;
+		for (int i = 2; i < n; i++) { // Lücke oben rechts
+			double a = i * (Math.PI * 2) / n;
+			int px = cx + (int) Math.round(r * Math.cos(a));
+			int py = cy + (int) Math.round(r * Math.sin(a));
+			c.fill(px, py, px + 1, py + 1, color);
+		}
+		// Pfeilspitze am Anfang (oben rechts).
+		c.fill(cx + r - 1, cy - r, cx + r + 2, cy - r + 1, color);
+		c.fill(cx + r, cy - r - 1, cx + r + 1, cy - r + 2, color);
 	}
 
 	private void outline(DrawContext c, GroupRect r, int gap, int color) {

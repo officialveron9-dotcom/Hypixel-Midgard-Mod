@@ -113,12 +113,23 @@ public class EventHud {
 					if (t == EventType.MINING_EVENT) {
 						continue;
 					}
-					out.add(new HudGroup(t.name(), t.displayName,
-							List.of(new HudRow("", "in 2h", COLOR_UPCOMING, List.of(), false)),
-							EventIcons.forEvent(t)));
+					out.add(eventGroup(cfg, t));
 				}
 				return out;
 		}
+	}
+
+	/** Eine Event-Vorschau-Gruppe mit so vielen Zeilen wie eingestellt (kommende). */
+	private HudGroup eventGroup(ModConfig cfg, EventType t) {
+		int n = (t == EventType.JACOB_CONTEST || !t.isLiveOnly())
+				? Math.max(1, cfg.getUpcomingEvent(t))
+				: 1;
+		List<HudRow> rows = new ArrayList<>();
+		for (int i = 0; i < n; i++) {
+			rows.add(new HudRow("", i == 0 ? "aktiv" : "in " + (i + 1) + "h",
+					i == 0 ? COLOR_ACTIVE : COLOR_UPCOMING, List.of(), false));
+		}
+		return new HudGroup(t.name(), t.displayName, rows, EventIcons.forEvent(t));
 	}
 
 	/** Zeichnet die Editor-Gruppen an ihren Rechtecken; deaktivierte ausgegraut. */
@@ -141,9 +152,7 @@ public class EventHud {
 			if (t == EventType.MINING_EVENT || !cfg.isElementEnabled(t.name())) {
 				continue;
 			}
-			out.add(new HudGroup(t.name(), t.displayName,
-					List.of(new HudRow("", "in 2h", COLOR_UPCOMING, List.of(), false)),
-					EventIcons.forEvent(t)));
+			out.add(eventGroup(cfg, t));
 		}
 		return out;
 	}
