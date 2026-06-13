@@ -1,10 +1,13 @@
 package com.midgard.events.gui;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.midgard.Midgard;
 import com.midgard.events.config.ModConfig;
+import com.midgard.events.event.EventType;
 import com.midgard.events.hud.EventHud;
 import com.midgard.events.hud.EventHud.GroupRect;
 import com.midgard.events.hud.EventHud.HudGroup;
@@ -18,10 +21,11 @@ import net.minecraft.text.Text;
 
 /**
  * HUD bearbeiten. Schritt 1: Standort wählen (Garten / Mining / Überall).
- * Schritt 2: alle HUD-Elemente dieses Standorts – per Auge-Icon an/aus
- * (deaktivierte sind ausgegraut), per Welt/Map-Icon überall-oder-nur-hier,
- * ziehen zum Verschieben, Mausrad für die Größe, Doppelklick = Standard.
- * Unten eine Legende, die die Icons erklärt.
+ * Schritt 2: in der Bildschirmmitte eine Liste aller Elemente des Standorts –
+ * Häkchen an/aus (Box leuchtet bzw. ist ausgegraut), bei Events ein Stepper
+ * für die Anzahl kommender, bei Garten/Mining ein M/W (nur hier / überall).
+ * Die HUD-Boxen selbst zieht man frei; Events erscheinen als Geister, damit
+ * man Überlappungen sieht (und das Andocken sie meidet). Ganz unten "Zurück".
  */
 public class HudPositionScreen extends Screen {
 
@@ -33,7 +37,6 @@ public class HudPositionScreen extends Screen {
 	private static final int CARD = 0xFF1E1E26;
 	private static final int CARD_HOVER = 0xFF2C2C3A;
 	private static final int ON = 0xFF35B36A;
-	private static final int OFF = 0xFF60606C;
 	private static final int HOVER_OUTLINE = 0x50FFFFFF;
 
 	private static final int EDGE_MARGIN = 2;
@@ -52,23 +55,41 @@ public class HudPositionScreen extends Screen {
 	private HudElements.Location activeLoc = null;
 	private String selected = null;
 	private boolean dragging = false;
-	private boolean dragMoved = false;
 	private int dragOffsetX, dragOffsetY;
-	private int doneX, doneY, doneW, doneH;
 
 	public HudPositionScreen(Screen parent) {
 		super(Text.literal("HUD bearbeiten"));
 		this.parent = parent;
 	}
 
-	// ---- Layout des aktuellen Standorts -----------------------------------
+	// ---- Gruppen / Layout des aktuellen Standorts -------------------------
 
-	private List<HudGroup> groups() {
+	private List<HudGroup> editable() {
 		return EventHud.INSTANCE.editorGroups(cfg, activeLoc);
 	}
 
+	private List<HudGroup> ghosts() {
+		return activeLoc == HudElements.Location.GLOBAL
+				? List.of()
+				: EventHud.INSTANCE.enabledGlobalGroups(cfg);
+	}
+
+	private List<HudGroup> all() {
+		List<HudGroup> out = new ArrayList<>(editable());
+		out.addAll(ghosts());
+		return out;
+	}
+
 	private List<GroupRect> layout() {
-		return EventHud.INSTANCE.layout(cfg, groups());
+		return EventHud.INSTANCE.layout(cfg, all());
+	}
+
+	private Set<String> editableKeys() {
+		Set<String> keys = new HashSet<>();
+		for (HudGroup g : editable()) {
+			keys.add(g.key());
+		}
+		return keys;
 	}
 
 	private GroupRect rectOf(String key) {
@@ -80,6 +101,8 @@ public class HudPositionScreen extends Screen {
 		return null;
 	}
 
+	// ---- Render -----------------------------------------------------------
+
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		clickables.clear();
@@ -90,19 +113,15 @@ public class HudPositionScreen extends Screen {
 		} else {
 			drawEditor(context, mouseX, mouseY);
 		}
-		drawDone(context, mouseX, mouseY);
+		drawBack(context, mouseX, mouseY);
 	}
-
-	// ---- Schritt 1: Standort wählen ---------------------------------------
 
 	private void drawLocationPicker(DrawContext context, int mouseX, int mouseY) {
 		String title = "Standort wählen";
-		txtScaled(context, title, (this.width - txtW(title, true) * 2) / 2, this.height / 2 - 70, TEXT, true, 2f);
-
-		HudElements.Location[] locs = HudElements.Location.values();
+		txtScaled(context, title, (this.width - txtW(title, true) * 2) / 2, this.height / 2 - 72, TEXT, true, 2f);
 		int bw = 220, bh = 30, gap = 8;
 		int y = this.height / 2 - 30;
-		for (HudElements.Location loc : locs) {
+		for (HudElements.Location loc : HudElements.Location.values()) {
 			int x = (this.width - bw) / 2;
 			boolean hover = mouseX >= x && mouseX <= x + bw && mouseY >= y && mouseY <= y + bh;
 			sprite(context, x, y, bw, bh, hover ? CARD_HOVER : CARD);
@@ -117,124 +136,150 @@ public class HudPositionScreen extends Screen {
 			}));
 			y += bh + gap;
 		}
-
-		String hint = "Tipp: Standortelemente erscheinen normal nur an ihrem Ort – mit dem Welt-Icon überall.";
-		txt(context, hint, (this.width - txtW(hint, false)) / 2, y + 10, TEXT_DIM, false);
 	}
 
-	// ---- Schritt 2: Elemente eines Standorts ------------------------------
-
 	private void drawEditor(DrawContext context, int mouseX, int mouseY) {
-		List<HudGroup> groups = groups();
-		List<GroupRect> rects = layout();
+		List<HudGroup> editable = editable();
+		List<HudGroup> ghosts = ghosts();
+		List<HudGroup> all = new ArrayList<>(editable);
+		all.addAll(ghosts);
+		List<GroupRect> rects = EventHud.INSTANCE.layout(cfg, all);
 
-		// HUD-Elemente (deaktivierte ausgegraut).
-		EventHud.INSTANCE.renderEditor(context, cfg, groups, rects);
+		List<GroupRect> editRects = rects.subList(0, editable.size());
+		List<GroupRect> ghostRects = rects.subList(editable.size(), rects.size());
 
-		// Rahmen + Icons je Element.
-		GroupRect hovered = hit(rects, mouseX, mouseY);
-		for (GroupRect r : rects) {
-			boolean sel = r.key().equals(selected);
-			if (sel) {
+		// Geister (Events) zuerst, dann editierbare Boxen darüber.
+		EventHud.INSTANCE.renderGhostGroups(context, cfg, ghosts, new ArrayList<>(ghostRects));
+		EventHud.INSTANCE.renderEditor(context, cfg, editable, new ArrayList<>(editRects));
+
+		GroupRect hovered = hit(editRects, mouseX, mouseY);
+		for (GroupRect r : editRects) {
+			if (r.key().equals(selected)) {
 				float pulse = (float) (0.5 + 0.5 * Math.sin(System.currentTimeMillis() / 220.0));
 				outline(context, r, 2, withAlpha(ACCENT, 150 + (int) (pulse * 105)));
 			} else if (hovered != null && r.key().equals(hovered.key()) && !dragging) {
 				outline(context, r, 2, HOVER_OUTLINE);
 			}
-			drawElementIcons(context, mouseX, mouseY, r);
 		}
 
-		// Kopfzeile: Zurück + Standortname.
-		int backW = 70, backH = 20;
-		int bx = 12, by = 12;
-		boolean bh = mouseX >= bx && mouseX <= bx + backW && mouseY >= by && mouseY <= by + backH;
-		sprite(context, bx, by, backW, backH, bh ? CARD_HOVER : CARD);
-		txtVC(context, "Zurück", bx + (backW - txtW("Zurück", true)) / 2, by, backH, TEXT, true);
-		clickables.add(new Clickable(bx, by, bx + backW, by + backH, () -> {
-			activeLoc = null;
-			selected = null;
-		}));
-		txtScaled(context, activeLoc.label, bx + backW + 16, by - 1, TEXT, true, 1.6f);
+		// Kopfzeile mit Standortnamen.
+		txtScaled(context, activeLoc.label + " bearbeiten", 14, 12, TEXT, true, 1.6f);
 
-		drawLegend(context);
+		drawElementList(context, mouseX, mouseY);
 	}
 
-	/** Auge-Icon (an/aus) und – außer bei Events – Welt/Map-Icon je Element. */
-	private void drawElementIcons(DrawContext context, int mouseX, int mouseY, GroupRect r) {
-		boolean enabled = cfg.isElementEnabled(r.key());
-		int sz = 12;
-		int iy = r.y() - sz - 2;
-		if (iy < 2) {
-			iy = r.y() + 2; // oben kein Platz -> in die Box
-		}
-		int ix = r.x();
+	/** Liste in der Mitte: Häkchen an/aus, Anzahl (Events), M/W (Garten/Mining). */
+	private void drawElementList(DrawContext context, int mouseX, int mouseY) {
+		List<HudElements.Element> els = HudElements.forLocation(activeLoc);
+		int rowH = 20;
+		int w = 300;
+		int headH = 24;
+		int legendH = 26;
+		int h = headH + els.size() * rowH + legendH;
+		int x = (this.width - w) / 2;
+		int y = (this.height - h) / 2;
 
-		// Auge: gefüllter Kreis (an) / hohler Kreis (aus).
-		boolean h1 = mouseX >= ix && mouseX <= ix + sz && mouseY >= iy && mouseY <= iy + sz;
-		sprite(context, ix, iy, sz, sz, h1 ? CARD_HOVER : CARD);
-		dot(context, ix + sz / 2, iy + sz / 2, enabled, enabled ? ON : OFF);
-		clickables.add(new Clickable(ix, iy, ix + sz, iy + sz, () -> {
-			cfg.setElementEnabled(r.key(), !cfg.isElementEnabled(r.key()));
-			cfg.save();
-		}));
+		sprite(context, x - 1, y - 1, w + 2, h + 2, BORDER);
+		sprite(context, x, y, w, h, PANEL);
+		txtVC(context, "Elemente", x + 12, y, headH, TEXT, true);
+		txtVC(context, "Häkchen = an/aus", x + w - 12 - txtW("Häkchen = an/aus", false), y, headH, TEXT_DIM, false);
 
-		// Welt/Map nur für Standort-Elemente (Events sind immer überall).
-		if (activeLoc != HudElements.Location.GLOBAL) {
-			int ix2 = ix + sz + 3;
-			boolean global = cfg.isElementGlobal(r.key());
-			boolean h2 = mouseX >= ix2 && mouseX <= ix2 + sz && mouseY >= iy && mouseY <= iy + sz;
-			sprite(context, ix2, iy, sz, sz, h2 ? CARD_HOVER : CARD);
-			txtVC(context, global ? "W" : "M", ix2 + (sz - txtW(global ? "W" : "M", true)) / 2, iy, sz,
-					global ? ACCENT : TEXT_DIM, true);
-			clickables.add(new Clickable(ix2, iy, ix2 + sz, iy + sz, () -> {
-				cfg.setElementGlobal(r.key(), !cfg.isElementGlobal(r.key()));
+		int ry = y + headH;
+		boolean global = activeLoc == HudElements.Location.GLOBAL;
+		for (HudElements.Element el : els) {
+			boolean on = cfg.isElementEnabled(el.key());
+			boolean rowHover = mouseX >= x && mouseX <= x + w && mouseY >= ry && mouseY <= ry + rowH;
+			if (rowHover) {
+				context.fill(x, ry, x + w, ry + rowH, 0x18FFFFFF);
+			}
+			// Häkchen.
+			int cb = 12;
+			int cx = x + 10;
+			int cy = ry + (rowH - cb) / 2;
+			sprite(context, cx, cy, cb, cb, CARD);
+			if (on) {
+				check(context, cx, cy, cb, ON);
+			}
+			clickables.add(new Clickable(cx, cy, cx + cb, cy + cb, () -> {
+				cfg.setElementEnabled(el.key(), !cfg.isElementEnabled(el.key()));
 				cfg.save();
 			}));
+			txt(context, el.name(), cx + cb + 8, ry + (rowH - capH()) / 2, on ? TEXT : TEXT_DIM, false);
+
+			int rightX = x + w - 10;
+
+			// Anzahl-Stepper für Events, die "kommende" unterstützen.
+			EventType ev = eventOf(el.key());
+			if (ev != null && supportsUpcoming(ev)) {
+				int bs = 14;
+				int by = ry + (rowH - bs) / 2;
+				int plusX = rightX - bs;
+				int n = cfg.getUpcomingEvent(ev);
+				String num = String.valueOf(n);
+				int numW = Math.max(12, txtW(num, true) + 2);
+				int valX = plusX - 4 - numW;
+				int minusX = valX - 4 - bs;
+				sprite(context, minusX, by, bs, bs, CARD);
+				txtC(context, "-", minusX + bs / 2, by, bs, TEXT, true);
+				txtC(context, num, valX + numW / 2, by, bs, TEXT, true);
+				sprite(context, plusX, by, bs, bs, CARD);
+				txtC(context, "+", plusX + bs / 2, by, bs, TEXT, true);
+				clickables.add(new Clickable(minusX, by, minusX + bs, by + bs, () -> {
+					cfg.setUpcomingEvent(ev, cfg.getUpcomingEvent(ev) - 1);
+					cfg.save();
+				}));
+				clickables.add(new Clickable(plusX, by, plusX + bs, by + bs, () -> {
+					cfg.setUpcomingEvent(ev, cfg.getUpcomingEvent(ev) + 1);
+					cfg.save();
+				}));
+			} else if (!global) {
+				// M/W: nur hier / überall.
+				boolean gl = cfg.isElementGlobal(el.key());
+				int bs = 16;
+				int bx = rightX - bs;
+				int by = ry + (rowH - bs) / 2;
+				boolean hov = mouseX >= bx && mouseX <= bx + bs && mouseY >= by && mouseY <= by + bs;
+				sprite(context, bx, by, bs, bs, hov ? CARD_HOVER : CARD);
+				txtC(context, gl ? "W" : "M", bx + bs / 2, by, bs, gl ? ACCENT : TEXT_DIM, true);
+				clickables.add(new Clickable(bx, by, bx + bs, by + bs, () -> {
+					cfg.setElementGlobal(el.key(), !cfg.isElementGlobal(el.key()));
+					cfg.save();
+				}));
+			}
+			ry += rowH;
 		}
+
+		// Kompakte Legende unten in der Liste.
+		String legend = global
+				? "+/- = Anzahl kommender · Ziehen = verschieben · Mausrad = Größe"
+				: "M/W = nur hier / überall · Ziehen = verschieben · Mausrad = Größe";
+		txt(context, legend, x + 12, ry + 8, TEXT_DIM, false);
 	}
 
-	private void drawLegend(DrawContext context) {
-		int x = 12;
-		int y = this.height - 58;
-		int w = 250, h = 46;
-		sprite(context, x, y, w, h, PANEL);
-		sprite(context, x, y, w, 1, BORDER);
-		txt(context, "Legende", x + 8, y + 6, TEXT, true);
-		dot(context, x + 13, y + 23, true, ON);
-		txt(context, "Element an", x + 24, y + 19, TEXT_DIM, false);
-		dot(context, x + 13, y + 35, false, OFF);
-		txt(context, "Element aus (ausgegraut)", x + 24, y + 31, TEXT_DIM, false);
-		txt(context, "M / W", x + 150, y + 19, ACCENT, true);
-		txt(context, "nur hier / überall", x + 150, y + 31, TEXT_DIM, false);
+	private void drawBack(DrawContext context, int mouseX, int mouseY) {
+		int w = 100, h = 22;
+		int x = (this.width - w) / 2;
+		int y = this.height - h - 10;
+		boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+		sprite(context, x - 1, y - 1, w + 2, h + 2, BORDER);
+		sprite(context, x, y, w, h, hover ? 0xFFFF8A45 : ACCENT);
+		txtC(context, "Zurück", x + w / 2, y, h, 0xFF15151A, true);
+		clickables.add(new Clickable(x, y, x + w, y + h, () -> {
+			if (activeLoc != null) {
+				activeLoc = null; // zur Standortauswahl
+				selected = null;
+			} else {
+				close(); // Editor schließen
+			}
+		}));
 	}
 
-	// ---- Gemeinsamer Fertig-Button ----------------------------------------
+	// ---- Zeichen-Hilfen ---------------------------------------------------
 
-	private void drawDone(DrawContext context, int mouseX, int mouseY) {
-		doneW = 88;
-		doneH = 22;
-		doneX = this.width - doneW - 12;
-		doneY = this.height - doneH - 12;
-		boolean hover = mouseX >= doneX && mouseX <= doneX + doneW && mouseY >= doneY && mouseY <= doneY + doneH;
-		sprite(context, doneX - 1, doneY - 1, doneW + 2, doneH + 2, BORDER);
-		sprite(context, doneX, doneY, doneW, doneH, hover ? 0xFFFF8A45 : ACCENT);
-		txt(context, "Fertig", doneX + (doneW - txtW("Fertig", true)) / 2,
-				doneY + (doneH - capH() + 1) / 2, 0xFF15151A, true);
-		clickables.add(new Clickable(doneX, doneY, doneX + doneW, doneY + doneH, this::close));
-	}
-
-	// ---- Hilfen -----------------------------------------------------------
-
-	private void dot(DrawContext c, int cx, int cy, boolean filled, int color) {
-		if (filled) {
-			c.fill(cx - 3, cy - 2, cx + 3, cy + 2, color);
-			c.fill(cx - 2, cy - 3, cx + 2, cy + 3, color);
-		} else {
-			c.fill(cx - 3, cy - 2, cx + 3, cy - 1, color);
-			c.fill(cx - 3, cy + 1, cx + 3, cy + 2, color);
-			c.fill(cx - 3, cy - 2, cx - 2, cy + 2, color);
-			c.fill(cx + 2, cy - 2, cx + 3, cy + 2, color);
-		}
+	private void check(DrawContext c, int x, int y, int size, int color) {
+		int m = size / 2;
+		c.fill(x + 3, y + m, x + 5, y + size - 2, color);
+		c.fill(x + 4, y + size - 4, x + size - 2, y + 3, color);
 	}
 
 	private void outline(DrawContext c, GroupRect r, int gap, int color) {
@@ -258,10 +303,27 @@ public class HudPositionScreen extends Screen {
 		return null;
 	}
 
+	private EventType eventOf(String key) {
+		for (EventType t : EventType.values()) {
+			if (t.name().equals(key)) {
+				return t;
+			}
+		}
+		return null;
+	}
+
+	private static boolean supportsUpcoming(EventType type) {
+		return type == EventType.JACOB_CONTEST || !type.isLiveOnly();
+	}
+
 	private void txt(DrawContext c, String s, int x, int yTop, int color, boolean bold) {
 		if (!com.midgard.render.MidgardText.draw(c, s, x, yTop, 9f, color, bold)) {
 			c.drawText(textRenderer, bold ? Fonts.bold(s) : Fonts.regular(s), x, yTop, color, false);
 		}
+	}
+
+	private void txtC(DrawContext c, String s, int cx, int yTop, int boxH, int color, boolean bold) {
+		txt(c, s, cx - txtW(s, bold) / 2, yTop + (boxH - capH()) / 2, color, bold);
 	}
 
 	private void txtVC(DrawContext c, String s, int x, int yTop, int boxH, int color, boolean bold) {
@@ -306,7 +368,13 @@ public class HudPositionScreen extends Screen {
 		if (activeLoc == null) {
 			return super.mouseClicked(click, doubled);
 		}
-		GroupRect r = hit(layout(), mx, my);
+		Set<String> keys = editableKeys();
+		GroupRect r = null;
+		for (GroupRect cand : layout()) {
+			if (keys.contains(cand.key()) && cand.contains(mx, my)) {
+				r = cand;
+			}
+		}
 		if (r != null) {
 			selected = r.key();
 			if (doubled) {
@@ -317,7 +385,6 @@ public class HudPositionScreen extends Screen {
 				return true;
 			}
 			dragging = true;
-			dragMoved = false;
 			dragOffsetX = (int) (mx - r.x());
 			dragOffsetY = (int) (my - r.y());
 			return true;
@@ -333,7 +400,6 @@ public class HudPositionScreen extends Screen {
 			if (r == null) {
 				return true;
 			}
-			dragMoved = true;
 			int nx = clamp((int) (click.x() - dragOffsetX), 0, this.width - 10);
 			int ny = clamp((int) (click.y() - dragOffsetY), 0, this.height - 10);
 			if (nx <= SNAP_DIST) {

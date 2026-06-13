@@ -134,6 +134,30 @@ public class EventHud {
 		}
 	}
 
+	/** Aktivierte Event-Gruppen (immer überall) – als Kontext/Geister im Editor. */
+	public List<HudGroup> enabledGlobalGroups(ModConfig cfg) {
+		List<HudGroup> out = new ArrayList<>();
+		for (EventType t : EventType.values()) {
+			if (t == EventType.MINING_EVENT || !cfg.isElementEnabled(t.name())) {
+				continue;
+			}
+			out.add(new HudGroup(t.name(), t.displayName,
+					List.of(new HudRow("", "in 2h", COLOR_UPCOMING, List.of(), false)),
+					EventIcons.forEvent(t)));
+		}
+		return out;
+	}
+
+	/** Zeichnet Geister-Gruppen (anderer Standort) gedämpft – nur als Kontext. */
+	public void renderGhostGroups(DrawContext context, ModConfig cfg, List<HudGroup> groups, List<GroupRect> rects) {
+		for (int i = 0; i < groups.size(); i++) {
+			useScale(cfg, groups.get(i).key());
+			GroupRect r = rects.get(i);
+			drawGroup(context, cfg, groups.get(i), r.x(), r.y(), true);
+			context.fill(r.x() - 2, r.y() - 2, r.x() + r.w() + 2, r.y() + r.h() + 2, 0x77000010);
+		}
+	}
+
 	/** Events + Garden zu einer Gruppenliste zusammensetzen. */
 	private List<HudGroup> collect(ModConfig cfg, List<EventDisplay> events, boolean preview) {
 		List<HudGroup> out = new ArrayList<>();
