@@ -391,6 +391,11 @@ public class ConfigScreen extends Screen {
 					cfg.setEventEnabled(EventType.MINING_EVENT, !cfg.isEventEnabled(EventType.MINING_EVENT));
 					cfg.save();
 				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Powder (Mithril/Gemstone/Glacite)",
+				() -> cfg.miningPowder, () -> {
+					cfg.miningPowder = !cfg.miningPowder;
+					cfg.save();
+				}));
 		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Goblin-Wegpunkte",
 				() -> cfg.miningGoblinWaypoints, () -> {
 					cfg.miningGoblinWaypoints = !cfg.miningGoblinWaypoints;
@@ -421,6 +426,10 @@ public class ConfigScreen extends Screen {
 
 	private void buildEventRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
 		for (EventCategory category : EventCategory.values()) {
+			// Mining-Events haben ihr Zuhause im Mining-Tab – hier nicht doppeln.
+			if (category == EventCategory.MINING) {
+				continue;
+			}
 			List<EventType> inCat = new ArrayList<>();
 			for (EventType t : EventType.values()) {
 				if (t.category == category) {

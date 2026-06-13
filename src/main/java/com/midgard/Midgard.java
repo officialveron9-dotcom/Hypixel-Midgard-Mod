@@ -37,7 +37,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-13b (Wegpunkt-Fix am Boden, Insel-Erkennung alle Gebiete, immer-sichtbar, schneller)");
+		System.out.println("[Midgard] init build=2026-06-13c (Powder-Anzeige, Mining-Events nur noch im Mining-Tab)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

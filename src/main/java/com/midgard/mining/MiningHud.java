@@ -24,6 +24,7 @@ public final class MiningHud {
 	public static final String KEY_COMMISSIONS = "MINING_COMMISSIONS";
 	public static final String KEY_ABILITY = "MINING_ABILITY";
 	public static final String KEY_EVENT = "MINING_EVENT";
+	public static final String KEY_POWDER = "MINING_POWDER";
 
 	private static final int GREEN = 0xFF5BE36B;
 	private static final int DIM = 0xFF9A9AA5;
@@ -72,7 +73,28 @@ public final class MiningHud {
 			out.add(new HudGroup(KEY_ABILITY, "Pickaxe", rows, Items.DIAMOND_PICKAXE));
 		}
 
-		// 3) Mining-Event: immer sichtbar wenn an; ohne Event "inaktiv".
+		// 3) Powder: Mithril / Gemstone / Glacite (immer sichtbar wenn an).
+		if (cfg.miningPowder) {
+			String mi = preview && d.mithril.isEmpty() ? "1.234.567" : d.mithril;
+			String ge = preview && d.gemstone.isEmpty() ? "89.012" : d.gemstone;
+			String gl = preview && d.glacite.isEmpty() ? "4.560" : d.glacite;
+			List<HudRow> rows = new ArrayList<>();
+			if (!mi.isEmpty()) {
+				rows.add(new HudRow("Mithril", mi, 0xFF6FE3C5, List.of(), false));
+			}
+			if (!ge.isEmpty()) {
+				rows.add(new HudRow("Gemstone", ge, 0xFFE36FD8, List.of(), false));
+			}
+			if (!gl.isEmpty()) {
+				rows.add(new HudRow("Glacite", gl, 0xFF8FC7FF, List.of(), false));
+			}
+			if (rows.isEmpty()) {
+				rows.add(new HudRow("", "kein Powder", DIM, List.of(), false));
+			}
+			out.add(new HudGroup(KEY_POWDER, "Powder", rows, Items.GLOWSTONE_DUST));
+		}
+
+		// 4) Mining-Event: immer sichtbar wenn an; ohne Event "inaktiv".
 		if (cfg.isEventEnabled(EventType.MINING_EVENT)) {
 			String ev = MiningEventReader.INSTANCE.activeEvent();
 			long secs = Math.round(MiningEventReader.INSTANCE.remainingSeconds());

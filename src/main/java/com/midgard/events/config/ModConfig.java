@@ -65,6 +65,8 @@ public class ModConfig {
 	public boolean miningGoblinWaypoints = true;
 	/** Wegpunkt zum Commission-Gebiet (Dwarven Mines, ungefähre Koordinaten). */
 	public boolean miningCommissionWaypoints = true;
+	/** Powder-Anzeige (Mithril / Gemstone / Glacite). */
+	public boolean miningPowder = true;
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 

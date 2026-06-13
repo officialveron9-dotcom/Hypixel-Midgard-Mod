@@ -40,8 +40,16 @@ public class MiningData {
 			"Hazardous Miner", 140,
 			"Vein Seeker", 60);
 
+	private static final Pattern MITHRIL = Pattern.compile("(?i)Mithril(?:\\s*Powder)?:\\s*([\\d.,]+)");
+	private static final Pattern GEMSTONE = Pattern.compile("(?i)Gemstone(?:\\s*Powder)?:\\s*([\\d.,]+)");
+	private static final Pattern GLACITE = Pattern.compile("(?i)Glacite(?:\\s*Powder)?:\\s*([\\d.,]+)");
+
 	public volatile boolean onMiningIsland = false;
 	public volatile List<Commission> commissions = List.of();
+	/** Powder-Stände ("-" = nicht gefunden). */
+	public volatile String mithril = "";
+	public volatile String gemstone = "";
+	public volatile String glacite = "";
 	/** Zuletzt benutzte Ability + Ablaufzeitpunkt (ms), 0 = nichts bekannt. */
 	public volatile String abilityName = "";
 	public volatile long abilityReadyMs = 0;
@@ -133,6 +141,30 @@ public class MiningData {
 		}
 		commissions = coms;
 
+		// Powder aus Tab-Liste + Scoreboard (Best-Effort).
+		List<String> sb2 = ScoreboardReader.sidebarLines(mc);
+		String mi = "", ge = "", gl = "";
+		List<String> all = new ArrayList<>(tab);
+		all.addAll(sb2);
+		for (String raw : all) {
+			String line = raw == null ? "" : raw;
+			Matcher m = MITHRIL.matcher(line);
+			if (mi.isEmpty() && m.find()) {
+				mi = m.group(1).trim();
+			}
+			m = GEMSTONE.matcher(line);
+			if (ge.isEmpty() && m.find()) {
+				ge = m.group(1).trim();
+			}
+			m = GLACITE.matcher(line);
+			if (gl.isEmpty() && m.find()) {
+				gl = m.group(1).trim();
+			}
+		}
+		mithril = mi;
+		gemstone = ge;
+		glacite = gl;
+
 		long now = System.currentTimeMillis();
 		if (now - lastDiagMs > 15_000) {
 			lastDiagMs = now;
@@ -140,7 +172,8 @@ public class MiningData {
 			for (String t : tab) {
 				String lt = t.toLowerCase(Locale.ROOT);
 				if (lt.startsWith("area:") || lt.contains("commission") || lt.contains("event")
-						|| lt.contains("powder")) {
+						|| lt.contains("powder") || lt.contains("mithril") || lt.contains("gemstone")
+						|| lt.contains("glacite")) {
 					sb.append(" | ").append(t);
 				}
 			}
