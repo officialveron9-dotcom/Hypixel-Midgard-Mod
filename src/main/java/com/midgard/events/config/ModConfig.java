@@ -90,6 +90,10 @@ public class ModConfig {
 	public Map<String, Integer> hudGroupY = new HashMap<>();
 	/** Pro HUD-Gruppe: Größenfaktor (1.0 = Standard). */
 	public Map<String, Float> hudGroupScale = new HashMap<>();
+	/** Pro HUD-Element: an/aus (Schlüssel = Element-Key). Fehlt = Standard. */
+	public Map<String, Boolean> hudElementEnabled = new HashMap<>();
+	/** Pro HUD-Element: überall anzeigen (true) statt nur am Standort (false). */
+	public Map<String, Boolean> hudElementGlobal = new HashMap<>();
 
 	// --- Logik -------------------------------------------------------------
 
@@ -128,6 +132,49 @@ public class ModConfig {
 
 	public void setUpcomingEvent(EventType type, int value) {
 		upcomingPerEvent.put(type.name(), Math.max(1, Math.min(10, value)));
+	}
+
+	// --- HUD-Elemente (Aktivierung + Geltungsbereich) ------------------------
+	// Brücke: Event-Elemente nutzen weiter eventEnabled, alle anderen die
+	// hudElementEnabled-Map. So gibt es EINE Abfrage für den Editor.
+
+	private static EventType eventByKey(String key) {
+		for (EventType t : EventType.values()) {
+			if (t.name().equals(key)) {
+				return t;
+			}
+		}
+		return null;
+	}
+
+	public boolean isElementEnabled(String key) {
+		EventType t = eventByKey(key);
+		if (t != null) {
+			return isEventEnabled(t);
+		}
+		return hudElementEnabled.getOrDefault(key,
+				com.midgard.events.hud.HudElements.defaultOn(key));
+	}
+
+	public void setElementEnabled(String key, boolean value) {
+		EventType t = eventByKey(key);
+		if (t != null) {
+			setEventEnabled(t, value);
+		} else {
+			hudElementEnabled.put(key, value);
+		}
+	}
+
+	/** Überall anzeigen (true) oder nur am Standort (false)? Events = immer überall. */
+	public boolean isElementGlobal(String key) {
+		if (eventByKey(key) != null) {
+			return true;
+		}
+		return hudElementGlobal.getOrDefault(key, false);
+	}
+
+	public void setElementGlobal(String key, boolean value) {
+		hudElementGlobal.put(key, value);
 	}
 
 	// --- HUD-Gruppen (Einzel-Position + Einzel-Größe) ------------------------
@@ -194,6 +241,12 @@ public class ModConfig {
 					}
 					if (cfg.hudGroupScale == null) {
 						cfg.hudGroupScale = new HashMap<>();
+					}
+					if (cfg.hudElementEnabled == null) {
+						cfg.hudElementEnabled = new HashMap<>();
+					}
+					if (cfg.hudElementGlobal == null) {
+						cfg.hudElementGlobal = new HashMap<>();
 					}
 					if (cfg.globalFontName == null) {
 						cfg.globalFontName = "";

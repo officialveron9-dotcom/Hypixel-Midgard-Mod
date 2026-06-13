@@ -42,17 +42,22 @@ public final class GardenHud {
 	private GardenHud() {
 	}
 
+	/**
+	 * Element sichtbar? In der Vorschau (Editor) IMMER (disabled werden dort
+	 * ausgegraut), sonst: aktiviert UND (im Garten ODER überall-Modus).
+	 */
+	private static boolean vis(ModConfig cfg, String key, boolean preview) {
+		return preview || (cfg.isElementEnabled(key)
+				&& (GardenData.INSTANCE.onGarden || cfg.isElementGlobal(key)));
+	}
+
 	public static List<HudGroup> groups(ModConfig cfg, boolean preview) {
 		GardenData g = GardenData.INSTANCE;
-		// Garden-Boxen gibt es NUR im Garten – auch im HUD-Editor.
-		if (!g.onGarden) {
-			return List.of();
-		}
 		FarmingTracker f = FarmingTracker.INSTANCE;
 		List<HudGroup> out = new ArrayList<>();
 
 		// 1) Besucher (Namen links, Smaragd rechts).
-		if (cfg.gardenVisitors) {
+		if (vis(cfg, KEY_VISITORS, preview)) {
 			List<String> vis = g.visitors;
 			if (preview && vis.isEmpty()) {
 				vis = List.of("Jacob", "Anita", "Spaceman");
@@ -71,7 +76,7 @@ public final class GardenHud {
 		}
 
 		// 2) Schädlinge: Anzahl + befallene Plots; aktueller Plot rot.
-		if (cfg.gardenPests) {
+		if (vis(cfg, KEY_PESTS, preview)) {
 			int count = g.pestCount;
 			List<String> plots = g.infestedPlots;
 			boolean sample = preview && plots.isEmpty() && count == 0;
@@ -98,8 +103,7 @@ public final class GardenHud {
 		}
 
 		// 3-5) EINE kombinierte Farming-Box: Cultivating, Raten, Milestone, Yaw/Pitch.
-		if ((cfg.gardenTool || cfg.gardenStats || cfg.gardenCollection)
-				&& (preview || f.farming() || f.holdingFarmTool())) {
+		if (vis(cfg, KEY_STATS, preview) && (preview || f.farming() || f.holdingFarmTool())) {
 			String crop = f.crop().isEmpty() ? (preview ? "Wheat" : "") : f.crop();
 			List<HudRow> rows = new ArrayList<>();
 
@@ -168,7 +172,7 @@ public final class GardenHud {
 		}
 
 		// 6) Composter: Warnung (rot) wenn leer.
-		if (cfg.gardenComposter) {
+		if (vis(cfg, KEY_COMPOSTER, preview)) {
 			String matter = preview && g.composterMatter.isEmpty() ? "43,2k" : g.composterMatter;
 			String fuel = preview && g.composterFuel.isEmpty() ? "0" : g.composterFuel;
 			String time = preview && g.composterTime.isEmpty() ? "1h 4m" : g.composterTime;
@@ -190,7 +194,7 @@ public final class GardenHud {
 		}
 
 		// 7) Jacob-Contest live.
-		if (cfg.gardenJacob) {
+		if (vis(cfg, KEY_JACOB, preview)) {
 			long collected = g.jacobCollected;
 			int pct = g.jacobPercent;
 			if (preview && collected < 0) {

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.midgard.events.config.ModConfig;
-import com.midgard.events.event.EventType;
 import com.midgard.events.event.MiningEventReader;
 import com.midgard.events.hud.EventHud;
 import com.midgard.events.hud.EventHud.HudGroup;
@@ -32,16 +31,21 @@ public final class MiningHud {
 	private MiningHud() {
 	}
 
+	/**
+	 * Element sichtbar? In der Vorschau (Editor) IMMER (disabled werden dort
+	 * ausgegraut), sonst: aktiviert UND (auf Mining-Insel ODER überall-Modus).
+	 */
+	private static boolean vis(ModConfig cfg, String key, boolean preview) {
+		return preview || (cfg.isElementEnabled(key)
+				&& (MiningData.INSTANCE.onMiningIsland || cfg.isElementGlobal(key)));
+	}
+
 	public static List<HudGroup> groups(ModConfig cfg, boolean preview) {
 		MiningData d = MiningData.INSTANCE;
-		// Mining-Boxen gibt es NUR auf den Mining-Inseln – auch im HUD-Editor.
-		if (!d.onMiningIsland) {
-			return List.of();
-		}
 		List<HudGroup> out = new ArrayList<>();
 
 		// 1) Commissions; fertige grün, leer = Hinweis (immer sichtbar wenn an).
-		if (cfg.miningCommissions) {
+		if (vis(cfg, KEY_COMMISSIONS, preview)) {
 			List<MiningData.Commission> coms = d.commissions;
 			if (preview && coms.isEmpty()) {
 				coms = List.of(
@@ -60,7 +64,7 @@ public final class MiningHud {
 		}
 
 		// 2) Pickaxe-Ability: immer sichtbar wenn an; ohne Cooldown "Bereit".
-		if (cfg.miningAbility) {
+		if (vis(cfg, KEY_ABILITY, preview)) {
 			String name = d.abilityName.isEmpty() ? "Pickaxe-Ability" : d.abilityName;
 			long cd = d.abilityCooldownRemaining();
 			if (preview && d.abilityName.isEmpty()) {
@@ -74,7 +78,7 @@ public final class MiningHud {
 		}
 
 		// 3) Powder: Mithril / Gemstone / Glacite (immer sichtbar wenn an).
-		if (cfg.miningPowder) {
+		if (vis(cfg, KEY_POWDER, preview)) {
 			String mi = preview && d.mithril.isEmpty() ? "1.234.567" : d.mithril;
 			String ge = preview && d.gemstone.isEmpty() ? "89.012" : d.gemstone;
 			String gl = preview && d.glacite.isEmpty() ? "4.560" : d.glacite;
@@ -95,7 +99,7 @@ public final class MiningHud {
 		}
 
 		// 4) Mining-Event: immer sichtbar wenn an; ohne Event "inaktiv".
-		if (cfg.isEventEnabled(EventType.MINING_EVENT)) {
+		if (vis(cfg, KEY_EVENT, preview)) {
 			String ev = MiningEventReader.INSTANCE.activeEvent();
 			long secs = Math.round(MiningEventReader.INSTANCE.remainingSeconds());
 			List<HudRow> rows = new ArrayList<>();

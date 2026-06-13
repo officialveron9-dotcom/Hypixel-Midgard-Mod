@@ -100,6 +100,40 @@ public class EventHud {
 		return layout(cfg, collect(cfg, events, true));
 	}
 
+	/** Beispiel-Gruppen EINES Standorts für den HUD-Editor (alle Elemente). */
+	public List<HudGroup> editorGroups(ModConfig cfg, HudElements.Location loc) {
+		switch (loc) {
+			case GARDEN:
+				return com.midgard.garden.GardenHud.groups(cfg, true);
+			case MINING:
+				return com.midgard.mining.MiningHud.groups(cfg, true);
+			default:
+				List<HudGroup> out = new ArrayList<>();
+				for (EventType t : EventType.values()) {
+					if (t == EventType.MINING_EVENT) {
+						continue;
+					}
+					out.add(new HudGroup(t.name(), t.displayName,
+							List.of(new HudRow("", "in 2h", COLOR_UPCOMING, List.of(), false)),
+							EventIcons.forEvent(t)));
+				}
+				return out;
+		}
+	}
+
+	/** Zeichnet die Editor-Gruppen an ihren Rechtecken; deaktivierte ausgegraut. */
+	public void renderEditor(DrawContext context, ModConfig cfg, List<HudGroup> groups, List<GroupRect> rects) {
+		for (int i = 0; i < groups.size(); i++) {
+			HudGroup g = groups.get(i);
+			GroupRect r = rects.get(i);
+			useScale(cfg, g.key());
+			drawGroup(context, cfg, g, r.x(), r.y(), true);
+			if (!cfg.isElementEnabled(g.key())) {
+				context.fill(r.x() - 2, r.y() - 2, r.x() + r.w() + 2, r.y() + r.h() + 2, 0xAA0E0E12);
+			}
+		}
+	}
+
 	/** Events + Garden zu einer Gruppenliste zusammensetzen. */
 	private List<HudGroup> collect(ModConfig cfg, List<EventDisplay> events, boolean preview) {
 		List<HudGroup> out = new ArrayList<>();

@@ -81,7 +81,10 @@ public class ConfigScreen extends Screen {
 		}
 	}
 
-	private record Row(int height, IntConsumer render) {
+	private record Row(int height, IntConsumer render, String search) {
+		Row(int height, IntConsumer render) {
+			this(height, render, "");
+		}
 	}
 
 	private final Screen parent;
@@ -89,10 +92,13 @@ public class ConfigScreen extends Screen {
 	private final List<Tab> tabs = List.of(
 			new Tab("Allgemein", false, 0xFFFFFFFF),
 			new Tab("Auktion", false, 0xFFFFC85C),
-			new Tab("Interface", false, 0xFF57D8FF),
-			new Tab("Events", true, ACCENT),
 			new Tab("Garden", false, 0xFF5BE36B),
 			new Tab("Mining", false, 0xFF4DA6FF));
+
+	/** Aktuelle Sucheingabe (oben links); leer = normale Tab-Ansicht. */
+	private String search = "";
+	private boolean searchFocused = false;
+	private int searchX, searchY, searchW, searchH;
 	private final List<Clickable> clickables = new ArrayList<>();
 	private final Map<String, Float> anim = new HashMap<>();
 	private final java.util.Set<EventCategory> expanded = new java.util.HashSet<>();
@@ -187,21 +193,52 @@ public class ConfigScreen extends Screen {
 	}
 
 	private void drawHeader(DrawContext context, int mouseX, int mouseY) {
-		Tab tab = tabs.get(selectedTab);
 		int contentX = px + SIDEBAR_W + 20;
-		txtScaled(context, tab.label(), contentX, py + 19, TEXT, true, 1.45f);
-		context.fill(contentX, py + 44, px + pw - 20, py + 45, DIVIDER);
+		int top = py + 12;
 
+		// X-Schließen rechts.
 		int s = 20;
 		int bx = px + pw - 28;
-		int by = py + 13;
-		boolean hover = mouseX >= bx && mouseX <= bx + s && mouseY >= by && mouseY <= by + s;
-		float hoverT = animate("close", hover, 16f);
+		boolean closeHover = mouseX >= bx && mouseX <= bx + s && mouseY >= top + 1 && mouseY <= top + 1 + s;
+		float hoverT = animate("close", closeHover, 16f);
 		if (hoverT > 0.01f) {
-			sprite(context, bx, by, s, s, withAlpha(0x8A3A3A, (int) (hoverT * 255)));
+			sprite(context, bx, top + 1, s, s, withAlpha(0x8A3A3A, (int) (hoverT * 255)));
 		}
-		txtC(context, "X", bx + s / 2, by, s, hover ? TEXT : TEXT_DIM, true);
-		clickables.add(new Clickable(bx, by, bx + s, by + s, this::close));
+		txtC(context, "X", bx + s / 2, top + 1, s, closeHover ? TEXT : TEXT_DIM, true);
+		clickables.add(new Clickable(bx, top + 1, bx + s, top + 1 + s, this::close));
+
+		// HUD-Editor-Button (links vom X).
+		String hudLbl = "HUD bearbeiten";
+		int hudW = txtW(hudLbl, true) + 22;
+		int hudH = 22;
+		int hudX = bx - 12 - hudW;
+		boolean hudHover = mouseX >= hudX && mouseX <= hudX + hudW && mouseY >= top && mouseY <= top + hudH;
+		sprite(context, hudX, top, hudW, hudH, hudHover ? 0xFFFF8A45 : ACCENT);
+		txtC(context, hudLbl, hudX + hudW / 2, top, hudH, 0xFF15151A, true);
+		clickables.add(new Clickable(hudX, top, hudX + hudW, top + hudH, () -> {
+			if (client != null) {
+				client.setScreen(new HudPositionScreen(this));
+			}
+		}));
+
+		// Suchfeld links.
+		searchX = contentX;
+		searchY = top;
+		searchH = 22;
+		searchW = hudX - 12 - contentX;
+		if (searchW > 280) {
+			searchW = 280;
+		}
+		sprite(context, searchX, searchY, searchW, searchH, searchFocused ? CARD_HOVER : CARD);
+		if (searchFocused) {
+			sprite(context, searchX, searchY, searchW, 1, ACCENT);
+		}
+		String shown = search.isEmpty() ? "Suche…" : search + (searchFocused ? "_" : "");
+		txtVC(context, shown, searchX + 10, searchY, searchH, search.isEmpty() ? TEXT_DIM : TEXT, false);
+		clickables.add(new Clickable(searchX, searchY, searchX + searchW, searchY + searchH,
+				() -> searchFocused = true));
+
+		context.fill(contentX, py + 44, px + pw - 20, py + 45, DIVIDER);
 	}
 
 	// ---- Content ----------------------------------------------------------
@@ -213,19 +250,25 @@ public class ConfigScreen extends Screen {
 		int cardW = px + pw - cardX - 18;
 
 		List<Row> rows = new ArrayList<>();
-		Tab tab = tabs.get(selectedTab);
-		if (tab.events()) {
-			buildEventRows(rows, context, mouseX, mouseY, cardX, cardW);
-		} else if (tab.label().equals("Garden")) {
-			buildGardenRows(rows, context, mouseX, mouseY, cardX, cardW);
-		} else if (tab.label().equals("Mining")) {
-			buildMiningRows(rows, context, mouseX, mouseY, cardX, cardW);
-		} else if (tab.label().equals("Auktion")) {
-			buildAuctionRows(rows, context, mouseX, mouseY, cardX, cardW);
-		} else if (tab.label().equals("Interface")) {
-			buildInterfaceRows(rows, context, mouseX, mouseY, cardX, cardW);
-		} else {
+		if (!search.isBlank()) {
+			// Suche: alle Einstellungen aller Tabs durchsuchen.
 			buildGeneralRows(rows, context, mouseX, mouseY, cardX, cardW);
+			buildAuctionRows(rows, context, mouseX, mouseY, cardX, cardW);
+			buildGardenRows(rows, context, mouseX, mouseY, cardX, cardW);
+			buildMiningRows(rows, context, mouseX, mouseY, cardX, cardW);
+			String q = search.toLowerCase();
+			rows.removeIf(r -> !r.search().toLowerCase().contains(q));
+		} else {
+			Tab tab = tabs.get(selectedTab);
+			if (tab.label().equals("Garden")) {
+				buildGardenRows(rows, context, mouseX, mouseY, cardX, cardW);
+			} else if (tab.label().equals("Mining")) {
+				buildMiningRows(rows, context, mouseX, mouseY, cardX, cardW);
+			} else if (tab.label().equals("Auktion")) {
+				buildAuctionRows(rows, context, mouseX, mouseY, cardX, cardW);
+			} else {
+				buildGeneralRows(rows, context, mouseX, mouseY, cardX, cardW);
+			}
 		}
 
 		int totalHeight = 0;
@@ -279,6 +322,12 @@ public class ConfigScreen extends Screen {
 					cfg.borderless = !cfg.borderless;
 					cfg.save();
 				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("hud"),
+				"Eigene Statusleisten", "Leben links, XP mittig, Mana rechts – Werte in der Leiste.",
+				() -> cfg.customBars, () -> {
+					cfg.customBars = !cfg.customBars;
+					cfg.save();
+				}));
 		out.add(fontHeaderRow(context, mouseX, mouseY, cardX, cardW));
 		if (fontExpanded) {
 			// Kompaktes Grid statt einer Zeile pro Schrift.
@@ -290,58 +339,8 @@ public class ConfigScreen extends Screen {
 		}
 	}
 
-	private void buildInterfaceRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
-		out.add(buttonRow(context, mouseX, mouseY, cardX, cardW, pngIcon("move"),
-				"HUD bearbeiten", "Elemente auswählen, verschieben und skalieren.", "Öffnen",
-				() -> {
-					if (client != null) {
-						client.setScreen(new HudPositionScreen(this));
-					}
-				}));
-		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("hud"),
-				"Eigene Statusleisten", "Leben links, XP mittig, Mana rechts – Werte in der Leiste.",
-				() -> cfg.customBars, () -> {
-					cfg.customBars = !cfg.customBars;
-					cfg.save();
-				}));
-	}
-
 	private void buildGardenRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Besucher",
-				() -> cfg.gardenVisitors, () -> {
-					cfg.gardenVisitors = !cfg.gardenVisitors;
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Schädlinge",
-				() -> cfg.gardenPests, () -> {
-					cfg.gardenPests = !cfg.gardenPests;
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Milestone-Rang",
-				() -> cfg.gardenCollection, () -> {
-					cfg.gardenCollection = !cfg.gardenCollection;
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Werkzeug-Level",
-				() -> cfg.gardenTool, () -> {
-					cfg.gardenTool = !cfg.gardenTool;
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Farming-Statistik",
-				() -> cfg.gardenStats, () -> {
-					cfg.gardenStats = !cfg.gardenStats;
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Composter",
-				() -> cfg.gardenComposter, () -> {
-					cfg.gardenComposter = !cfg.gardenComposter;
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Jacob Live",
-				() -> cfg.gardenJacob, () -> {
-					cfg.gardenJacob = !cfg.gardenJacob;
-					cfg.save();
-				}));
+		out.add(infoRow(context, cardX, "Die Garten-Anzeigen schaltest du im HUD-Editor (Button oben)."));
 		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Contest-Warnung (Chat)",
 				() -> cfg.jacobWarn, () -> {
 					cfg.jacobWarn = !cfg.jacobWarn;
@@ -376,26 +375,7 @@ public class ConfigScreen extends Screen {
 	}
 
 	private void buildMiningRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Commissions",
-				() -> cfg.miningCommissions, () -> {
-					cfg.miningCommissions = !cfg.miningCommissions;
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Pickaxe-Ability",
-				() -> cfg.miningAbility, () -> {
-					cfg.miningAbility = !cfg.miningAbility;
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Mining-Events",
-				() -> cfg.isEventEnabled(EventType.MINING_EVENT), () -> {
-					cfg.setEventEnabled(EventType.MINING_EVENT, !cfg.isEventEnabled(EventType.MINING_EVENT));
-					cfg.save();
-				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Powder (Mithril/Gemstone/Glacite)",
-				() -> cfg.miningPowder, () -> {
-					cfg.miningPowder = !cfg.miningPowder;
-					cfg.save();
-				}));
+		out.add(infoRow(context, cardX, "Commissions/Pickaxe/Powder schaltest du im HUD-Editor. Hier: Wegpunkte."));
 		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Mob-Wegpunkte (Goblins/Golems)",
 				() -> cfg.miningGoblinWaypoints, () -> {
 					cfg.miningGoblinWaypoints = !cfg.miningGoblinWaypoints;
@@ -413,6 +393,11 @@ public class ConfigScreen extends Screen {
 				}));
 	}
 
+	/** Reine Info-/Hinweiszeile (nicht klickbar). */
+	private Row infoRow(DrawContext context, int cardX, String text) {
+		return new Row(22, y -> txt(context, text, cardX + 2, y + 6, TEXT_DIM, false), "");
+	}
+
 	/** Kompakte Schalter-Zeile ohne Icon (Garden-Tab). */
 	private Row compactToggleRow(DrawContext context, int mouseX, int mouseY, int cardX, int cardW,
 			String title, java.util.function.BooleanSupplier value, Runnable onClick) {
@@ -426,7 +411,7 @@ public class ConfigScreen extends Screen {
 			int togH = 13;
 			drawToggle(context, cardX + cardW - 10 - togW, y + (EVENT_H - togH) / 2, togT, togW, togH);
 			clickables.add(new Clickable(cardX, y, cardX + cardW, y + EVENT_H, onClick));
-		});
+		}, title);
 	}
 
 	private void buildEventRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
@@ -558,7 +543,7 @@ public class ConfigScreen extends Screen {
 					com.midgard.render.MidgardFont.display(cfg.globalFontName), textX, y + 23, TEXT_DIM);
 			drawCaret(context, cardX + cardW - 22, y + CARD_H / 2, fontExpanded, TEXT_DIM);
 			clickables.add(new Clickable(cardX, y, cardX + cardW, y + CARD_H, () -> fontExpanded = !fontExpanded));
-		});
+		}, "Schriftart Font");
 	}
 
 	/** Eine Grid-Zeile mit {@code cols} Schriftarten nebeneinander (kompakt). */
@@ -634,7 +619,7 @@ public class ConfigScreen extends Screen {
 				previewMX = mouseX;
 				previewMY = mouseY;
 			}
-		});
+		}, title + " " + (desc == null ? "" : desc));
 	}
 
 	/** Schwebendes Vorschau-Fenster neben der Maus (über allem gezeichnet). */
@@ -679,7 +664,7 @@ public class ConfigScreen extends Screen {
 			txtC(context, button, bx + bw / 2, by, bh, 0xFF15151A, true);
 
 			clickables.add(new Clickable(bx, by, bx + bw, by + bh, onClick));
-		});
+		}, title + " " + (desc == null ? "" : desc));
 	}
 
 	// ---- gemeinsame Teile -------------------------------------------------
@@ -878,6 +863,9 @@ public class ConfigScreen extends Screen {
 	public boolean mouseClicked(Click click, boolean doubled) {
 		double mx = click.x();
 		double my = click.y();
+		// Klick außerhalb des Suchfelds nimmt den Fokus weg (das Suchfeld-
+		// Clickable setzt ihn gleich wieder, wenn man es trifft).
+		searchFocused = false;
 		for (Clickable c : clickables) {
 			if (c.contains(mx, my)) {
 				c.action().run();
@@ -885,6 +873,36 @@ public class ConfigScreen extends Screen {
 			}
 		}
 		return super.mouseClicked(click, doubled);
+	}
+
+	@Override
+	public boolean charTyped(net.minecraft.client.input.CharInput input) {
+		if (searchFocused && input.isValidChar()) {
+			search += input.asString();
+			scroll = 0;
+			return true;
+		}
+		return super.charTyped(input);
+	}
+
+	@Override
+	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
+		if (searchFocused) {
+			int keyCode = input.key();
+			if (keyCode == 259 && !search.isEmpty()) { // Backspace
+				search = search.substring(0, search.length() - 1);
+				return true;
+			}
+			if (keyCode == 256) { // Esc: Suche leeren / Fokus weg
+				if (!search.isEmpty()) {
+					search = "";
+				} else {
+					searchFocused = false;
+				}
+				return true;
+			}
+		}
+		return super.keyPressed(input);
 	}
 
 	@Override
