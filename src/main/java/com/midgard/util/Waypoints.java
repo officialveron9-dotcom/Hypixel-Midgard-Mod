@@ -26,49 +26,79 @@ public final class Waypoints {
 	private Waypoints() {
 	}
 
+	/**
+	 * Wiederverwendbarer Projektor: rechnet Weltpunkte mit der aktuellen Kamera
+	 * auf den Bildschirm. Einmal pro Frame bauen, mehrfach nutzen.
+	 */
+	private static final class Projector {
+		final Vec3d eye;
+		final double[] fwd, right, up;
+		final double focal;
+		final int w, h;
+
+		Projector(MinecraftClient mc, Camera cam, int w, int h) {
+			this.eye = cam.getCameraPos();
+			double yaw = Math.toRadians(cam.getYaw());
+			double pitch = Math.toRadians(cam.getPitch());
+			double cy = Math.cos(yaw), syw = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+			this.fwd = new double[] { -syw * cp, -sp, cy * cp };
+			this.right = norm(cross(fwd, new double[] { 0, 1, 0 }));
+			this.up = cross(right, fwd);
+			double fovDeg = mc.options.getFov().getValue();
+			if (fovDeg < 30) {
+				fovDeg = 70;
+			}
+			this.focal = (h / 2.0) / Math.tan(Math.toRadians(fovDeg) / 2.0);
+			this.w = w;
+			this.h = h;
+		}
+
+		/** {x, y} oder null (hinter der Kamera / unrealistisch weit). */
+		int[] project(double wx, double wy, double wz) {
+			double dx = wx - eye.x, dy = wy - eye.y, dz = wz - eye.z;
+			double depth = dx * fwd[0] + dy * fwd[1] + dz * fwd[2];
+			if (depth <= 0.1) {
+				return null;
+			}
+			double rc = dx * right[0] + dy * right[1] + dz * right[2];
+			double uc = dx * up[0] + dy * up[1] + dz * up[2];
+			int sx = (int) Math.round(w / 2.0 + (rc / depth) * focal);
+			int sy = (int) Math.round(h / 2.0 - (uc / depth) * focal);
+			if (sx < -3000 || sx > w + 3000 || sy < -3000 || sy > h + 3000) {
+				return null;
+			}
+			return new int[] { sx, sy };
+		}
+	}
+
+	private static Projector projector(DrawContext context) {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		Camera cam = mc.gameRenderer == null ? null : mc.gameRenderer.getCamera();
+		if (cam == null) {
+			return null;
+		}
+		return new Projector(mc, cam, context.getScaledWindowWidth(), context.getScaledWindowHeight());
+	}
+
 	public static void render(DrawContext context, List<Marker> markers) {
 		if (markers.isEmpty()) {
 			return;
 		}
-		MinecraftClient mc = MinecraftClient.getInstance();
-		Camera cam = mc.gameRenderer == null ? null : mc.gameRenderer.getCamera();
-		if (cam == null) {
+		Projector p = projector(context);
+		if (p == null) {
 			return;
 		}
-		Vec3d eye = cam.getCameraPos();
-		double yaw = Math.toRadians(cam.getYaw());
-		double pitch = Math.toRadians(cam.getPitch());
-
-		// Kamera-Basis (rechtshändig): forward, right = forward x worldUp, up = right x forward.
-		double cy = Math.cos(yaw);
-		double syw = Math.sin(yaw);
-		double cp = Math.cos(pitch);
-		double sp = Math.sin(pitch);
-		double[] fwd = { -syw * cp, -sp, cy * cp };
-		double[] right = norm(cross(fwd, new double[] { 0, 1, 0 }));
-		double[] up = cross(right, fwd);
-
-		int w = context.getScaledWindowWidth();
-		int h = context.getScaledWindowHeight();
-		double fovDeg = mc.options.getFov().getValue();
-		if (fovDeg < 30) {
-			fovDeg = 70;
-		}
-		double focal = (h / 2.0) / Math.tan(Math.toRadians(fovDeg) / 2.0);
-
 		for (Marker m : markers) {
 			try {
-				// Auf Augenhöhe des Ziels projizieren, damit der Text gut sichtbar ist.
-				int[] s = project(m.x() + 0.5, m.y() + 1.2, m.z() + 0.5, eye, fwd, right, up, focal, w, h);
-				if (s == null || s[0] < -2000 || s[0] > w + 2000 || s[1] < -2000 || s[1] > h + 2000) {
-					continue; // hinter der Kamera oder unrealistisch weit weg
+				int[] s = p.project(m.x() + 0.5, m.y() + 1.2, m.z() + 0.5);
+				if (s == null) {
+					continue;
 				}
 				diamond(context, s[0], s[1], m.color());
-
-				double dist = Math.sqrt(sq(m.x() + 0.5 - eye.x) + sq(m.y() - eye.y) + sq(m.z() + 0.5 - eye.z));
+				double dist = Math.sqrt(sq(m.x() + 0.5 - p.eye.x) + sq(m.y() - p.eye.y) + sq(m.z() + 0.5 - p.eye.z));
 				String label = m.label() + " " + Math.round(dist) + "m";
 				int tw = textW(label);
-				int lx = Math.max(2, Math.min(w - tw - 2, s[0] - tw / 2));
+				int lx = Math.max(2, Math.min(p.w - tw - 2, s[0] - tw / 2));
 				int ly = s[1] - capH() - 5;
 				context.fill(lx - 2, ly - 2, lx + tw + 2, ly + capH() + 2, 0x90000000);
 				text(context, label, lx, ly, m.color());
@@ -78,21 +108,39 @@ public final class Waypoints {
 		}
 	}
 
-	/** Welt -> Bildschirm. {x, y} oder null (hinter der Kamera). */
-	private static int[] project(double wx, double wy, double wz, Vec3d eye,
-			double[] fwd, double[] right, double[] up, double focal, int w, int h) {
-		double dx = wx - eye.x;
-		double dy = wy - eye.y;
-		double dz = wz - eye.z;
-		double depth = dx * fwd[0] + dy * fwd[1] + dz * fwd[2];
-		if (depth <= 0.1) {
-			return null;
+	/**
+	 * Pfad-Linie: setzt vom Punkt {@code from} bis zum Ziel {@code target} alle
+	 * paar Blöcke einen Punkt (über die Bildschirm-Projektion verbunden). Erste
+	 * Version eines „Wegweisers" – noch KEIN Hindernis-Pathfinding (das kommt
+	 * für die Dungeons), sondern die direkte Linie über den Boden.
+	 */
+	public static void renderPath(DrawContext context, Vec3d from, Marker target, int color) {
+		if (from == null || target == null) {
+			return;
 		}
-		double rc = dx * right[0] + dy * right[1] + dz * right[2];
-		double uc = dx * up[0] + dy * up[1] + dz * up[2];
-		int sx = (int) Math.round(w / 2.0 + (rc / depth) * focal);
-		int sy = (int) Math.round(h / 2.0 - (uc / depth) * focal);
-		return new int[] { sx, sy };
+		Projector p = projector(context);
+		if (p == null) {
+			return;
+		}
+		double tx = target.x() + 0.5, ty = target.y(), tz = target.z() + 0.5;
+		double dist = Math.sqrt(sq(tx - from.x) + sq(ty - from.y) + sq(tz - from.z));
+		if (dist < 2 || dist > 120) {
+			return; // zu nah / zu weit für eine sinnvolle Linie
+		}
+		int steps = Math.max(2, Math.min(60, (int) (dist / 3)));
+		try {
+			for (int i = 1; i <= steps; i++) {
+				double t = i / (double) steps;
+				int[] s = p.project(from.x + (tx - from.x) * t, from.y + (ty - from.y) * t,
+						from.z + (tz - from.z) * t);
+				if (s == null) {
+					continue;
+				}
+				int r = i == steps ? 3 : 2; // Ziel-Ende etwas größer
+				context.fill(s[0] - r, s[1] - r, s[0] + r, s[1] + r, color);
+			}
+		} catch (Throwable ignored) {
+		}
 	}
 
 	private static void diamond(DrawContext c, int cx, int cy, int color) {

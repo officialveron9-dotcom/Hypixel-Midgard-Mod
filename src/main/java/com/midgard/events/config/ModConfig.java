@@ -67,6 +67,8 @@ public class ModConfig {
 	public boolean miningCommissionWaypoints = true;
 	/** Powder-Anzeige (Mithril / Gemstone / Glacite). */
 	public boolean miningPowder = true;
+	/** Pfad-Linie über den Boden zum nächsten Wegpunkt. */
+	public boolean miningPathLine = true;
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 

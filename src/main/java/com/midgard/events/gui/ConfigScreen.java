@@ -406,6 +406,11 @@ public class ConfigScreen extends Screen {
 					cfg.miningCommissionWaypoints = !cfg.miningCommissionWaypoints;
 					cfg.save();
 				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Pfad-Linie zum nächsten Ziel",
+				() -> cfg.miningPathLine, () -> {
+					cfg.miningPathLine = !cfg.miningPathLine;
+					cfg.save();
+				}));
 	}
 
 	/** Kompakte Schalter-Zeile ohne Icon (Garden-Tab). */

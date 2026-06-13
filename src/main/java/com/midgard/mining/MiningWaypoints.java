@@ -86,6 +86,27 @@ public final class MiningWaypoints {
 		return cached;
 	}
 
+	/** Der dem Spieler nächste Marker (für die Pfad-Linie) oder null. */
+	public static Marker nearest() {
+		List<Marker> list = cached;
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (list.isEmpty() || mc.player == null) {
+			return null;
+		}
+		double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
+		Marker best = null;
+		double bestD = Double.MAX_VALUE;
+		for (Marker m : list) {
+			double dx = m.x() - px, dy = m.y() - py, dz = m.z() - pz;
+			double d = dx * dx + dy * dy + dz * dz;
+			if (d < bestD) {
+				bestD = d;
+				best = m;
+			}
+		}
+		return best;
+	}
+
 	/** Fasst nahe beieinander liegende Positionen zu Cluster-Mittelpunkten zusammen. */
 	private static void cluster(List<double[]> pts, String name, List<Marker> out) {
 		List<double[]> centers = new ArrayList<>(); // {sumX,sumY,sumZ,count}

@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-13f (Crash-Schutz HUD, Mob-Cluster-Marker, Wegpunkte im Tick gecacht)");
+		System.out.println("[Midgard] init build=2026-06-13g (Pfad-Linie zum naechsten Wegpunkt, v1 direkt)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -145,6 +145,13 @@ public class Midgard implements ClientModInitializer {
 			}
 			try {
 				com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
+				net.minecraft.client.MinecraftClient cl = net.minecraft.client.MinecraftClient.getInstance();
+				if (config != null && config.miningPathLine && cl.player != null) {
+					net.minecraft.util.math.Vec3d feet = new net.minecraft.util.math.Vec3d(
+							cl.player.getX(), cl.player.getY(), cl.player.getZ());
+					com.midgard.util.Waypoints.renderPath(context, feet,
+							com.midgard.mining.MiningWaypoints.nearest(), 0xFFFFFFFF);
+				}
 			} catch (Throwable t) {
 				logOnce("Wegpunkte", t);
 			}
