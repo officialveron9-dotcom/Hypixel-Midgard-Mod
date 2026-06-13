@@ -245,7 +245,55 @@ public class EventHud {
 				stackY += m[2] + gap;
 			}
 		}
-		return out;
+		return resolveOverlaps(out, gap);
+	}
+
+	/**
+	 * Schiebt überlappende Gruppen auseinander, sodass sich NIE zwei Boxen
+	 * überlappen – egal ob frei platziert, gestapelt oder neu dazugekommen.
+	 * Greedy nach Listen-Reihenfolge: jede Box behält ihren Wunschplatz, solange
+	 * frei; sonst wandert sie unter die kollidierende Box, bei Bildschirm-Ende
+	 * in die nächste Spalte. Nicht-destruktiv (ändert die Config nicht).
+	 */
+	private List<GroupRect> resolveOverlaps(List<GroupRect> rects, int gap) {
+		int g = Math.max(2, gap);
+		MinecraftClient mc = MinecraftClient.getInstance();
+		int sw = mc.getWindow() != null ? mc.getWindow().getScaledWidth() : 1920;
+		int sh = mc.getWindow() != null ? mc.getWindow().getScaledHeight() : 1080;
+		List<GroupRect> placed = new ArrayList<>();
+		for (GroupRect r : rects) {
+			int x = Math.max(2, Math.min(r.x(), sw - r.w() - 2));
+			int y = Math.max(2, Math.min(r.y(), sh - r.h() - 2));
+			int col = 0;
+			for (int iter = 0; iter < 400; iter++) {
+				GroupRect hit = firstHit(placed, x, y, r.w(), r.h(), g);
+				if (hit == null) {
+					break;
+				}
+				y = hit.y() + hit.h() + g; // unter die kollidierende Box
+				if (y + r.h() > sh - 2) {  // unten raus -> nächste Spalte rechts
+					col++;
+					y = Math.max(2, Math.min(r.y(), sh - r.h() - 2));
+					x = Math.min(sw - r.w() - 2, x + r.w() + g);
+					if (col > 12) {
+						break; // Sicherheitsnetz
+					}
+				}
+			}
+			placed.add(new GroupRect(r.key(), r.title(), x, y, r.w(), r.h()));
+		}
+		return placed;
+	}
+
+	private GroupRect firstHit(List<GroupRect> placed, int x, int y, int w, int h, int gap) {
+		for (GroupRect p : placed) {
+			boolean apart = x + w + gap <= p.x() || p.x() + p.w() + gap <= x
+					|| y + h + gap <= p.y() || p.y() + p.h() + gap <= y;
+			if (!apart) {
+				return p;
+			}
+		}
+		return null;
 	}
 
 	private void draw(DrawContext context, ModConfig cfg, List<HudGroup> groups, boolean preview) {
