@@ -150,6 +150,31 @@ public final class Waypoints {
 		}
 	}
 
+	/**
+	 * Zeichnet einen fertigen Pfad (Liste von Welt-Punkten, z. B. vom A*) als
+	 * durchgehende Bildschirm-Linie. Sicher (kein Eingriff in Engine-Puffer).
+	 */
+	public static void renderPolyline(DrawContext context, java.util.List<Vec3d> pts, int color) {
+		if (pts == null || pts.size() < 2) {
+			return;
+		}
+		Projector p = projector(context);
+		if (p == null) {
+			return;
+		}
+		try {
+			int[] prev = null;
+			for (Vec3d v : pts) {
+				int[] s = p.project(v.x, v.y + 0.1, v.z);
+				if (s != null && prev != null) {
+					thickLine(context, prev[0], prev[1], s[0], s[1], color);
+				}
+				prev = s;
+			}
+		} catch (Throwable ignored) {
+		}
+	}
+
 	/** Verbindet zwei Bildschirmpunkte mit einer durchgehenden, dicken Linie. */
 	private static void thickLine(DrawContext c, int x1, int y1, int x2, int y2, int color) {
 		int dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
