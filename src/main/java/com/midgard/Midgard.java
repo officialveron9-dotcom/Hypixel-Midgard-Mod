@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14o (Crystal-Hollows-Navi: Orte-Liste per Taste N, Klick = navigieren, Abbrechen)");
+		System.out.println("[Midgard] init build=2026-06-14p (Navi lernt auch benannte NPCs/Bosse in der Naehe, CH-Entity-Diagnose)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

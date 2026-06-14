@@ -8,6 +8,7 @@ import java.util.Map;
 import com.midgard.events.skyblock.ScoreboardReader;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
 
 /**
  * Crystal-Hollows-Navi: Crystal Hollows wird pro Instanz ZUFÄLLIG generiert,
@@ -30,7 +31,18 @@ public final class CrystalNav {
 			"Fairy Grotto",
 			"Khazad-dum",
 			"Jungle Temple",
-			"Lava Tubes");
+			"Lava Tubes",
+			"Goblin King",
+			"Corleone");
+
+	/** Benannte NPCs/Bosse -> Ort (werden als Entity in der Nähe automatisch gelernt). */
+	private static final Map<String, String> NPC_TO_LOCATION = Map.of(
+			"king yolkar", "Goblin King",
+			"goblin king", "Goblin King",
+			"corleone", "Corleone",
+			"team treasurite", "Precursor Remnants",
+			"automaton", "Precursor Remnants",
+			"professor robot", "Precursor Remnants");
 
 	private static final int[] NUCLEUS = { 513, 125, 513 };
 
@@ -38,6 +50,7 @@ public final class CrystalNav {
 	private static volatile String targetName;
 	private static volatile int[] targetPos;
 	private static boolean wasInCH = false;
+	private static long lastDiagMs = 0;
 
 	private CrystalNav() {
 	}
@@ -58,12 +71,47 @@ public final class CrystalNav {
 		if (mc.player == null) {
 			return;
 		}
+		// 1) Gebiet aus dem Scoreboard lernen (eigene Position).
 		String area = detectArea(mc);
 		if (area != null) {
 			learned.put(area, new int[] {
 					(int) Math.round(mc.player.getX()),
 					(int) Math.round(mc.player.getY()),
 					(int) Math.round(mc.player.getZ()) });
+		}
+		// 2) Benannte NPCs/Bosse in der Nähe erkennen und ihren Ort lernen.
+		if (mc.world != null) {
+			long now = System.currentTimeMillis();
+			boolean diag = now - lastDiagMs > 20_000;
+			StringBuilder names = diag ? new StringBuilder() : null;
+			int scanned = 0;
+			for (Entity e : mc.world.getEntities()) {
+				if (scanned++ > 300 || e.getName() == null) {
+					continue;
+				}
+				String en = ScoreboardReader.stripFormatting(e.getName().getString());
+				String low = en.toLowerCase(Locale.ROOT);
+				int[] pos = { (int) Math.round(e.getX()), (int) Math.round(e.getY()), (int) Math.round(e.getZ()) };
+				// direkt nach Ortsnamen im NPC-Namen
+				for (String loc : LOCATIONS) {
+					if (!loc.equals("Crystal Nucleus") && low.contains(loc.toLowerCase(Locale.ROOT))) {
+						learned.put(loc, pos);
+					}
+				}
+				// bekannte NPC-/Boss-Namen -> Ort
+				for (Map.Entry<String, String> e2 : NPC_TO_LOCATION.entrySet()) {
+					if (low.contains(e2.getKey())) {
+						learned.put(e2.getValue(), pos);
+					}
+				}
+				if (diag && en.length() > 2 && en.matches(".*[A-Za-z].*") && !en.startsWith("[")) {
+					names.append(" | ").append(en);
+				}
+			}
+			if (diag) {
+				lastDiagMs = now;
+				System.out.println("[Midgard] CH-Entities:" + names);
+			}
 		}
 	}
 
