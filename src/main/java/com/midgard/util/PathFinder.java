@@ -35,6 +35,10 @@ public final class PathFinder {
 	private static BlockPos lastGoal;
 	private static long lastCalcMs = 0;
 
+	/** 4 Himmelsrichtungen (für senkrechte Loch-Auf-/Abstiege). */
+	private static final int[] HX = { 1, -1, 0, 0 };
+	private static final int[] HZ = { 0, 0, 1, -1 };
+
 	/**
 	 * Begehbarkeits-Cache pro Berechnung: {@code getCollisionShape} ist teuer und
 	 * jeder Block wird als Nachbar mehrfach geprüft. Einmal pro Block je A*-Lauf
@@ -178,16 +182,35 @@ public final class PathFinder {
 						}
 						continue;
 					}
-					// b) Fallen: Kante frei -> nach unten zum nächsten Landeplatz (bis 6 tief).
+					// b) Fallen: Kante frei -> nach unten zum nächsten Landeplatz (bis 12
+					// tief, z. B. durch ein Loch im BODEN in die Etage darunter). Immer
+					// 2 frei am Landeplatz (canStand) -> man passt durch und kann laufen.
 					BlockPos edge = cp.add(dx, 0, dz);
 					if (passable(world, edge) && passable(world, edge.up())) {
-						for (int d = 2; d <= 6; d++) {
+						for (int d = 2; d <= 12; d++) {
 							BlockPos land = cp.add(dx, -d, dz);
 							if (canStand(world, land)) {
 								relax(open, best, came, cp, cur.g, land, horiz + d * 0.25, target);
 								break;
 							}
+							if (!passable(world, land)) {
+								break; // auf einen Block getroffen -> kein Durchfall hier
+							}
 						}
+					}
+				}
+			}
+			// c) Durch ein Loch in der DECKE nach oben: über dem Kopf ein freier
+			// Schacht (immer 2 frei), dann seitlich auf den oberen Boden am Lochrand
+			// treten. So führt der Weg durch Decken-Löcher in die Etage darüber.
+			for (int dy = 1; dy <= 6; dy++) {
+				if (!passable(world, cp.up(dy + 1))) {
+					break; // Schacht/Decke zu -> nicht weiter hoch
+				}
+				for (int di = 0; di < 4; di++) {
+					BlockPos side = cp.add(HX[di], dy, HZ[di]);
+					if (canStand(world, side)) {
+						relax(open, best, came, cp, cur.g, side, 1.3 * dy + 1.0, target);
 					}
 				}
 			}
