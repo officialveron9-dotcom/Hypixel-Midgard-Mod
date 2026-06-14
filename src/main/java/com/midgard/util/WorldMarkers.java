@@ -11,7 +11,6 @@ import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Vec3d;
 
@@ -25,9 +24,6 @@ import net.minecraft.util.math.Vec3d;
  * -> kann die Engine nie crashen.
  */
 public final class WorldMarkers {
-
-	private static BufferAllocator allocator;
-	private static VertexConsumerProvider.Immediate immediate;
 
 	private WorldMarkers() {
 	}
@@ -47,21 +43,19 @@ public final class WorldMarkers {
 		Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
 		Quaternionf rot = mc.gameRenderer.getCamera().getRotation();
 		TextRenderer tr = mc.textRenderer;
-		if (immediate == null) {
-			allocator = new BufferAllocator(1 << 16);
-			immediate = VertexConsumerProvider.immediate(allocator);
-		}
+		// Entity-Puffer des Spiels nutzen – der zeichnet die Schrift-Layer korrekt
+		// (eigener Puffer rendert Text-Layer oft nicht). draw() flusht nur unseres.
+		VertexConsumerProvider.Immediate immediate = mc.getBufferBuilders().getEntityVertexConsumers();
 
 		for (Marker m : markers) {
 			try {
 				double wx = m.x() + 0.5, wy = m.y() + 1.5, wz = m.z() + 0.5;
 				double dx = wx - cam.x, dy = wy - cam.y, dz = wz - cam.z;
 				double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-				if (dist > 400) {
+				if (dist > 500) {
 					continue;
 				}
-				// Skalierung wächst mit der Entfernung -> Label bleibt lesbar groß
-				// (konstante Bildschirmgröße), statt winzig zu werden.
+				// Skalierung wächst mit der Entfernung -> Label bleibt lesbar groß.
 				float s = 0.025f * (float) Math.max(1.0, dist / 10.0);
 				ms.push();
 				ms.translate(dx, dy, dz);
@@ -71,11 +65,10 @@ public final class WorldMarkers {
 				String name = m.label();
 				String distLine = Math.round(dist) + "m";
 				int light = 0xF000F0;
-				int bg = 0x55000000;
-				tr.draw(name, -tr.getWidth(name) / 2f, -10f, m.color(), false, mat, immediate,
-						TextRenderer.TextLayerType.SEE_THROUGH, bg, light);
-				tr.draw(distLine, -tr.getWidth(distLine) / 2f, 0f, 0xFFFFFFFF, false, mat, immediate,
-						TextRenderer.TextLayerType.SEE_THROUGH, bg, light);
+				tr.draw(name, -tr.getWidth(name) / 2f, -10f, m.color(), true, mat, immediate,
+						TextRenderer.TextLayerType.SEE_THROUGH, 0, light);
+				tr.draw(distLine, -tr.getWidth(distLine) / 2f, 0f, 0xFFFFFFFF, true, mat, immediate,
+						TextRenderer.TextLayerType.SEE_THROUGH, 0, light);
 				ms.pop();
 			} catch (Throwable ignored) {
 				// einzelner Marker darf nie alles abreißen

@@ -114,7 +114,7 @@ public final class PathFinder {
 				bestNode = cp;
 			}
 			if (cp.isWithinDistance(target, 1.6)) {
-				return build(came, cp, s);
+				return build(world, came, cp, s);
 			}
 			Double bg = best.get(cp.asLong());
 			if (bg != null && cur.g > bg + 1e-3) {
@@ -162,8 +162,9 @@ public final class PathFinder {
 			}
 		}
 		// Kein voller Weg gefunden -> Teilweg bis zum nächstgelegenen Punkt
-		// (folgt dem Boden), statt einer geraden Linie durch die Wand.
-		return bestNode.equals(s) ? straightFallback(start, goal) : build(came, bestNode, s);
+		// (folgt dem Boden). Wenn gar nichts geht: KEINE Linie (lieber nichts als
+		// eine gerade Linie durch die Wand).
+		return bestNode.equals(s) ? List.of() : build(world, came, bestNode, s);
 	}
 
 	private static double heur(BlockPos a, BlockPos b) {
@@ -171,7 +172,7 @@ public final class PathFinder {
 		return Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
-	private static List<Vec3d> build(Map<Long, BlockPos> came, BlockPos end, BlockPos start) {
+	private static List<Vec3d> build(ClientWorld world, Map<Long, BlockPos> came, BlockPos end, BlockPos start) {
 		List<BlockPos> nodes = new ArrayList<>();
 		BlockPos c = end;
 		int guard = 0;
@@ -187,16 +188,16 @@ public final class PathFinder {
 		for (BlockPos p : nodes) {
 			pts.add(new Vec3d(p.getX() + 0.5, p.getY() + 0.08, p.getZ() + 0.5));
 		}
-		// Douglas-Peucker: macht aus dem Block-für-Block-Treppenmuster wenige,
-		// gerade Segmente (Punkt zu Punkt). Die Linie darf dabei auch mal kurz
-		// in der Luft verlaufen – Hauptsache gerade statt Zickzack.
-		return simplify(pts);
+		// Douglas-Peucker, aber WAND-BEWUSST: ein Abschnitt wird nur dann gerade
+		// gezogen, wenn die Luftlinie wirklich frei ist (sonst bleibt ein
+		// Stützpunkt). So bleibt es gerade UND geht nie durch einen Block.
+		return simplify(world, pts);
 	}
 
 	/** Wie stark vereinfacht wird (Blöcke). Größer = gerader, weniger Stützpunkte. */
 	private static final double DP_EPS = 1.3;
 
-	private static List<Vec3d> simplify(List<Vec3d> pts) {
+	private static List<Vec3d> simplify(ClientWorld world, List<Vec3d> pts) {
 		int sz = pts.size();
 		if (sz < 3) {
 			return pts;
@@ -204,7 +205,7 @@ public final class PathFinder {
 		boolean[] keep = new boolean[sz];
 		keep[0] = true;
 		keep[sz - 1] = true;
-		dp(pts, 0, sz - 1, keep);
+		dp(world, pts, 0, sz - 1, keep);
 		List<Vec3d> out = new ArrayList<>();
 		for (int i = 0; i < sz; i++) {
 			if (keep[i]) {
@@ -214,8 +215,12 @@ public final class PathFinder {
 		return out;
 	}
 
-	/** Douglas-Peucker: behält den am weitesten von der Geraden abweichenden Punkt. */
-	private static void dp(List<Vec3d> pts, int a, int b, boolean[] keep) {
+	/**
+	 * Douglas-Peucker mit Wand-Prüfung: behält den am weitesten abweichenden Punkt,
+	 * wenn die Abweichung groß ist ODER die direkte Strecke a-b durch einen Block
+	 * ginge. Dadurch wird nie eine Wand geschnitten.
+	 */
+	private static void dp(ClientWorld world, List<Vec3d> pts, int a, int b, boolean[] keep) {
 		if (b <= a + 1) {
 			return;
 		}
@@ -229,11 +234,27 @@ public final class PathFinder {
 				idx = i;
 			}
 		}
-		if (maxD > DP_EPS && idx > a) {
+		if (idx > a && (maxD > DP_EPS || !clearLine(world, pa, pb))) {
 			keep[idx] = true;
-			dp(pts, a, idx, keep);
-			dp(pts, idx, b, keep);
+			dp(world, pts, a, idx, keep);
+			dp(world, pts, idx, b, keep);
 		}
+	}
+
+	/** Ist die direkte Strecke a-b frei (jede Zelle durchquerbar, keine Wand)? */
+	private static boolean clearLine(ClientWorld world, Vec3d a, Vec3d b) {
+		double dist = a.distanceTo(b);
+		int steps = Math.max(1, (int) (dist / 0.35));
+		for (int s = 0; s <= steps; s++) {
+			double t = (double) s / steps;
+			double x = a.x + (b.x - a.x) * t;
+			double y = a.y + (b.y - a.y) * t;
+			double z = a.z + (b.z - a.z) * t;
+			if (!canFly(world, BlockPos.ofFloored(x, y, z))) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/** Abstand Punkt p zur Strecke a-b (3D). */
@@ -248,10 +269,9 @@ public final class PathFinder {
 	}
 
 
+	/** Kein begehbarer Weg -> KEINE Linie (nie eine gerade Linie durch Wände). */
 	private static List<Vec3d> straightFallback(BlockPos start, BlockPos goal) {
-		return List.of(
-				new Vec3d(start.getX() + 0.5, start.getY() + 0.1, start.getZ() + 0.5),
-				new Vec3d(goal.getX() + 0.5, goal.getY() + 0.1, goal.getZ() + 0.5));
+		return List.of();
 	}
 
 	// ---- Begehbarkeit -----------------------------------------------------

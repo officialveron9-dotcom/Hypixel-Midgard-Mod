@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15c (CH-Karte auslesen: Minimap-Farben+Marker, Pfad-Prio-Fix, Goblin-Erkennung, Ground/Air-Schalter)");
+		System.out.println("[Midgard] init build=2026-06-15d (Pfad NIE durch Waende, Marker-Text via Spiel-Puffer, Boden/Luft-Slider)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
