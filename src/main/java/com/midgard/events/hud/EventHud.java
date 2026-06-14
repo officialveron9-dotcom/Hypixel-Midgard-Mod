@@ -51,14 +51,24 @@ public class EventHud {
 	public static final int LABEL = 0xFFD6D8E0;
 	public static final int VALUE = 0xFFF2C94C;
 
+	/** Item-Badge: Icon + kleine Zahl daneben (z. B. Besucher-Items). */
+	public record Badge(Item item, String text) {
+	}
+
 	/**
 	 * Eine Zeile im einheitlichen Layout: Beschriftung LINKS (grau/weiß),
 	 * Wert RECHTS (eine Akzentfarbe), Icons ganz rechts. Ist die Beschriftung
 	 * leer, steht der Wert links. highlight = rote Alarm-Markierung.
+	 * {@code badges} = Icon+Zahl-Paare, die nach der Beschriftung erscheinen.
 	 */
-	public record HudRow(String label, String value, int valueColor, List<Item> icons, boolean highlight) {
+	public record HudRow(String label, String value, int valueColor, List<Item> icons, boolean highlight,
+			List<Badge> badges) {
+		public HudRow(String label, String value, int valueColor, List<Item> icons, boolean highlight) {
+			this(label, value, valueColor, icons, highlight, List.of());
+		}
+
 		public HudRow(String label, String value) {
-			this(label, value, VALUE, List.of(), false);
+			this(label, value, VALUE, List.of(), false, List.of());
 		}
 	}
 
@@ -221,9 +231,14 @@ public class EventHud {
 		return h > 0 ? h : Math.round(fontSize() * 0.7f);
 	}
 
+	private int badgeSize() {
+		return Math.max(8, capH(false) + sp(3));
+	}
+
 	private int rowH(ModConfig cfg, HudRow row) {
 		int iconH = row.icons().isEmpty() ? 0 : iconSize(cfg);
-		return Math.max(iconH, capH(false) + sp(3));
+		int badgeH = row.badges().isEmpty() ? 0 : badgeSize();
+		return Math.max(Math.max(iconH, badgeH), capH(false) + sp(3));
 	}
 
 	private int textW(String s, float size, boolean bold) {
@@ -273,6 +288,9 @@ public class EventHud {
 		}
 		if (!row.icons().isEmpty()) {
 			w += row.icons().size() * iconStep(cfg) + sp(4);
+		}
+		for (Badge b : row.badges()) {
+			w += badgeSize() + sp(1) + textW(b.text(), fontSize(), false) + sp(4);
 		}
 		return w;
 	}
@@ -435,14 +453,39 @@ public class EventHud {
 			right -= iconsW + sp(4);
 		}
 
+		int cursor = x;
 		if (row.label().isEmpty()) {
 			// Nur ein Wert: links, in der Wert-Farbe.
 			outlined(context, row.value(), x, yTop, fs, row.valueColor(), false);
+			cursor = x + textW(row.value(), fs, false);
 		} else {
 			// Beschriftung links (grau/weiß), Wert rechtsbündig in der Akzentfarbe.
 			outlined(context, row.label(), x, yTop, fs, LABEL, false);
-			int vw = textW(row.value(), fs, false);
-			outlined(context, row.value(), right - vw, yTop, fs, row.valueColor(), false);
+			cursor = x + textW(row.label(), fs, false) + sp(6);
+			if (!row.value().isEmpty()) {
+				int vw = textW(row.value(), fs, false);
+				outlined(context, row.value(), right - vw, yTop, fs, row.valueColor(), false);
+			}
+		}
+
+		// Item-Badges (Icon + Zahl) nach der Beschriftung.
+		if (!row.badges().isEmpty()) {
+			int bsz = badgeSize();
+			float bScale = bsz / 16f;
+			Matrix3x2fStack m = context.getMatrices();
+			for (Badge b : row.badges()) {
+				m.pushMatrix();
+				m.translate(cursor, mid - bsz / 2);
+				m.scale(bScale, bScale);
+				context.drawItem(new ItemStack(b.item()), 0, 0);
+				m.popMatrix();
+				cursor += bsz + sp(1);
+				if (!b.text().isEmpty()) {
+					outlined(context, b.text(), cursor, yTop, fs, row.valueColor(), false);
+					cursor += textW(b.text(), fs, false);
+				}
+				cursor += sp(4);
+			}
 		}
 	}
 }

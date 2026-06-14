@@ -2,6 +2,8 @@ package com.midgard.garden;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.midgard.events.config.ModConfig;
 import com.midgard.events.event.EventIcons;
@@ -66,16 +68,19 @@ public final class GardenHud {
 			if (!vis.isEmpty() || !next.isEmpty()) {
 				List<HudRow> rows = new ArrayList<>();
 				for (String v : vis) {
-					String wants;
 					List<String> items = g.visitorItems.get(v);
 					if (items != null && !items.isEmpty()) {
-						wants = String.join(", ", items);
+						List<EventHud.Badge> badges = new ArrayList<>();
+						for (String it : items) {
+							badges.add(parseBadge(it));
+						}
+						rows.add(new HudRow(v + ":", "", VALUE, List.of(), false, badges));
 					} else if (preview) {
-						wants = "32x Wheat";
+						rows.add(new HudRow(v + ":", "", VALUE, List.of(), false,
+								List.of(new EventHud.Badge(EventIcons.forCrop("Wheat"), "32"))));
 					} else {
-						wants = "? (öffnen)";
+						rows.add(new HudRow(v + ":", "öffnen", VALUE, List.of(), false));
 					}
-					rows.add(new HudRow(v + ":", wants, VALUE, List.of(), false));
 				}
 				if (!next.isEmpty()) {
 					rows.add(new HudRow("Nächster", next));
@@ -237,6 +242,19 @@ public final class GardenHud {
 		}
 
 		return out;
+	}
+
+	private static final Pattern AMOUNT = Pattern.compile("(\\d[\\d.,]*)");
+
+	/** "32x Wheat" / "Wheat x32" -> Badge(Item-Icon, "32"). */
+	private static EventHud.Badge parseBadge(String s) {
+		String count = "";
+		Matcher m = AMOUNT.matcher(s);
+		if (m.find()) {
+			count = m.group(1).replace(".", "").replace(",", "");
+		}
+		String name = s.replaceAll("(?i)\\d[\\d.,]*\\s*x?", " ").replaceAll("\\s+", " ").trim();
+		return new EventHud.Badge(EventIcons.forCrop(name), count);
 	}
 
 	/** Bazaar-Sofortverkaufspreis des Roh-Crops (vom Backend) oder 0. */

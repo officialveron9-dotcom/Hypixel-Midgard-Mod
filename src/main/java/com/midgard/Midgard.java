@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-13k (Besucher zeigen benoetigte Items aus dem Menue)");
+		System.out.println("[Midgard] init build=2026-06-14a (Besucher-Items als Icon+Anzahl statt Text)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
