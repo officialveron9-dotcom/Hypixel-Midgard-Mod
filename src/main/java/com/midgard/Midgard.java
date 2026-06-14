@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14x (echte 3D-Geometrie statt LINES: kein Schwimmen, Perspektive, eigene Tiefen-Layer via AW)");
+		System.out.println("[Midgard] init build=2026-06-14y (Kristall-HUD+Diagnose, NPCs aus Wiki, Navi-Menue im HUD-Stil)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -174,6 +174,7 @@ public class Midgard implements ClientModInitializer {
 				com.midgard.mining.MiningData.INSTANCE.update(client);
 				com.midgard.mining.MiningWaypoints.tick(client);
 				com.midgard.mining.CrystalNav.tick(client);
+				com.midgard.mining.CrystalData.INSTANCE.update(client);
 				// Wegfinder: gewähltes Navi-Ziel (Crystal Hollows) hat Vorrang,
 				// sonst der nächste automatische Wegpunkt.
 				if (config.miningPathLine) {

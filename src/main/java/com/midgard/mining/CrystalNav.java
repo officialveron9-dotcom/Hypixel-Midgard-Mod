@@ -39,14 +39,23 @@ public final class CrystalNav {
 			"Goblin King",
 			"Corleone");
 
-	/** Benannte NPCs/Bosse -> Ort (werden als Entity in der Nähe automatisch gelernt). */
-	private static final Map<String, String> NPC_TO_LOCATION = Map.of(
-			"king yolkar", "Goblin King",
-			"goblin king", "Goblin King",
-			"corleone", "Corleone",
-			"team treasurite", "Precursor Remnants",
-			"automaton", "Precursor Remnants",
-			"professor robot", "Precursor Remnants");
+	/**
+	 * Benannte NPCs/Bosse -> Ort (werden als Entity in der Nähe automatisch
+	 * gelernt). Stand laut Wiki – die Crystal-Nucleus-Kristalle hängen daran:
+	 * King Yolkar=Amber, Keepers of Divan=Jade, Odawa/Kalhuiki=Amethyst,
+	 * Professor Robot=Sapphire (Topaz=Boss Bal in Khazad-dûm).
+	 */
+	private static final Map<String, String> NPC_TO_LOCATION = Map.ofEntries(
+			Map.entry("king yolkar", "Goblin King"),
+			Map.entry("goblin king", "Goblin King"),
+			Map.entry("corleone", "Corleone"),
+			Map.entry("team treasurite", "Precursor Remnants"),
+			Map.entry("automaton", "Precursor Remnants"),
+			Map.entry("professor robot", "Precursor Remnants"),
+			Map.entry("keeper of", "Mithril Deposits"),
+			Map.entry("odawa", "Jungle Temple"),
+			Map.entry("kalhuiki", "Jungle Temple"),
+			Map.entry("key guardian", "Jungle"));
 
 	private static final int[] NUCLEUS = { 513, 125, 513 };
 

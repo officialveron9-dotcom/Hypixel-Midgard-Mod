@@ -27,6 +27,7 @@ public final class MiningHud {
 	public static final String KEY_EVENT = "MINING_EVENT_HUD";
 	public static final String KEY_POWDER = "MINING_POWDER";
 	public static final String KEY_NAV = "MINING_NAV";
+	public static final String KEY_CRYSTALS = "MINING_CRYSTALS";
 
 	private static final int GREEN = 0xFF5BE36B;
 	private static final int DIM = 0xFF9A9AA5;
@@ -138,6 +139,38 @@ public final class MiningHud {
 			out.add(new HudGroup(KEY_NAV, "Navi", rows, Items.COMPASS));
 		}
 
+		// 6) Kristalle (nur in Crystal Hollows): abgegeben / noch offen.
+		if (cfg.isElementEnabled(KEY_CRYSTALS) && (preview || MiningData.INSTANCE.onCrystalHollows)) {
+			List<CrystalData.Crystal> cs = preview ? sampleCrystals() : CrystalData.INSTANCE.crystals();
+			List<HudRow> rows = new ArrayList<>();
+			int placed = 0;
+			for (CrystalData.Crystal c : cs) {
+				String txt;
+				int col;
+				switch (c.state()) {
+					case PLACED -> { txt = "abgegeben"; col = GREEN; placed++; }
+					case FOUND -> { txt = "gefunden"; col = 0xFFF2C94C; }
+					case MISSING -> { txt = "offen"; col = DIM; }
+					default -> { txt = "?"; col = DIM; }
+				}
+				rows.add(new HudRow(c.name(), txt, col, List.of(), false));
+			}
+			if (rows.isEmpty()) {
+				rows.add(new HudRow("", "keine Daten", DIM, List.of(), false));
+			}
+			out.add(new HudGroup(KEY_CRYSTALS, "Kristalle " + placed + "/5", rows, Items.AMETHYST_SHARD));
+		}
+
 		return out;
+	}
+
+	/** Beispiel-Kristalle für die Editor-Vorschau. */
+	private static List<CrystalData.Crystal> sampleCrystals() {
+		return List.of(
+				new CrystalData.Crystal("Jade", CrystalData.State.PLACED),
+				new CrystalData.Crystal("Amber", CrystalData.State.PLACED),
+				new CrystalData.Crystal("Amethyst", CrystalData.State.FOUND),
+				new CrystalData.Crystal("Sapphire", CrystalData.State.MISSING),
+				new CrystalData.Crystal("Topaz", CrystalData.State.MISSING));
 	}
 }

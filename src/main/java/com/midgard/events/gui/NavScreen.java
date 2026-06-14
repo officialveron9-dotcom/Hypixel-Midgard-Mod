@@ -6,6 +6,9 @@ import java.util.List;
 import com.midgard.mining.CrystalNav;
 import com.midgard.mining.MiningData;
 import com.midgard.mining.MiningWaypoints;
+import com.midgard.render.MidgardText;
+import com.midgard.render.UIRenderer;
+import com.midgard.util.Fonts;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
@@ -18,23 +21,23 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 /**
- * Navi-Ziel wählen. In Crystal Hollows: alle Orte (entdeckte/Nucleus anklickbar,
- * Rest ausgegraut). In den Dwarven Mines: die Emissär-Gebiete plus "Auto"
- * (zurück zur automatischen Commission-Navigation). Unten: nahe NPCs anzeigen
- * und laufende Navigation abbrechen.
+ * Navi-Ziel wählen – im selben Stil wie das HUD (runde, abgedunkelte Karten,
+ * scharfe Schrift, cyan Überschrift / orange Akzent) und kompakt. In Crystal
+ * Hollows die Orte, in den Dwarven Mines die Emissär-Gebiete + "Auto" + ein
+ * Fadenkreuz-Ziel. Unten: nahe NPCs anzeigen / Navigation abbrechen.
  */
 public class NavScreen extends Screen {
 
-	private static final int PANEL = 0xF2121419;
-	private static final int ACCENT = 0xFFD06BFF;
-	private static final int TEXT = 0xFFF1F1F4;
-	private static final int DIM = 0xFF6E6E78;
-	private static final int CARD = 0xFF1E1E26;
-	private static final int CARD_HOVER = 0xFF2C2C3A;
+	private static final int PANEL = 0xE6121218;
 	private static final int BORDER = 0x33FFFFFF;
+	private static final int HEADER = 0xFF57D8FF; // cyan, wie HUD-Titel
+	private static final int ACCENT = 0xFFF2772F; // orange
+	private static final int TEXT = 0xFFF1F1F4;
+	private static final int DIM = 0xFF8C8C97;
+	private static final int CARD = 0x66242430;
+	private static final int CARD_HOVER = 0x99343444;
 	private static final int RED = 0xFFE0443C;
 
-	/** Eine Zeile in der Auswahl. */
 	private record NavRow(String label, String tag, boolean enabled, boolean active, Runnable action) {
 	}
 
@@ -52,11 +55,9 @@ public class NavScreen extends Screen {
 		this.parent = parent;
 	}
 
-	/** Baut die Zeilen je nach aktuellem Ort. */
 	private List<NavRow> buildRows() {
 		List<NavRow> rows = new ArrayList<>();
 		if (MiningData.INSTANCE.onMiningIsland) {
-			// Dorthin navigieren, wohin man gerade schaut (Block vor dem Fadenkreuz).
 			rows.add(new NavRow("Fadenkreuz-Ziel (wohin ich schaue)", "setzen", true, false, () -> {
 				targetLookedAt();
 				close();
@@ -102,7 +103,6 @@ public class NavScreen extends Screen {
 			BlockPos p = ((BlockHitResult) hr).getBlockPos();
 			MiningWaypoints.setManual(p.getX() + 0.5, p.getY() + 1, p.getZ() + 0.5, "Fadenkreuz-Ziel");
 		} else {
-			// Kein Block getroffen: 30 Blöcke in Blickrichtung.
 			Vec3d eye = mc.player.getEyePos();
 			Vec3d dir = mc.player.getRotationVec(1f);
 			MiningWaypoints.setManual(eye.x + dir.x * 30, eye.y + dir.y * 30, eye.z + dir.z * 30, "Fadenkreuz-Ziel");
@@ -112,82 +112,101 @@ public class NavScreen extends Screen {
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		clickables.clear();
-		context.fill(0, 0, this.width, this.height, 0xAA000000);
+		context.fill(0, 0, this.width, this.height, 0x99000000);
 
 		List<NavRow> rows = buildRows();
-		String title = MiningData.INSTANCE.onCrystalHollows ? "Crystal Hollows – Ziel wählen"
-				: MiningData.INSTANCE.onMiningIsland ? "Dwarven Mines – Ziel wählen"
-						: "Navi-Ziel wählen";
+		String title = MiningData.INSTANCE.onCrystalHollows ? "Crystal Hollows – Ziel"
+				: MiningData.INSTANCE.onMiningIsland ? "Dwarven Mines – Ziel" : "Navi-Ziel";
 
-		int w = 250;
-		int rowH = 20;
-		int headH = 26;
-		int footH = 56;
+		int w = 224;
+		int rowH = 15;
+		int pad = 8;
+		int headH = 20;
+		int btnH = 15;
+		int footH = btnH * 2 + 4 + pad;
 		boolean empty = rows.isEmpty();
-		int bodyH = empty ? 24 : rows.size() * rowH;
+		int bodyH = (empty ? 16 : rows.size() * rowH) + 4;
 		int h = headH + bodyH + footH;
 		int x = (this.width - w) / 2;
 		int y = (this.height - h) / 2;
 
-		context.fill(x - 1, y - 1, x + w + 1, y + h + 1, BORDER);
-		context.fill(x, y, x + w, y + h, PANEL);
-		context.drawText(textRenderer, title, x + 12, y + 9, TEXT, false);
+		UIRenderer.fillRoundedRect(context, x - 1, y - 1, w + 2, h + 2, 7, BORDER);
+		UIRenderer.fillRoundedRect(context, x, y, w, h, 6, PANEL);
+		UIRenderer.fillRoundedRect(context, x + pad, y + 7, 3, headH - 8, 2, ACCENT);
+		txt(context, title, x + pad + 8, y + 7, HEADER, true);
 
 		int ry = y + headH;
 		if (empty) {
-			context.drawText(textRenderer, "Nur in Crystal Hollows / den Minen nutzbar.",
-					x + 12, ry + 8, DIM, false);
-			ry += bodyH;
+			txt(context, "Nur in Crystal Hollows / den Minen.", x + pad, ry + 5, DIM, false);
 		} else {
 			for (NavRow r : rows) {
-				boolean hover = r.enabled() && mouseX >= x && mouseX <= x + w && mouseY >= ry && mouseY <= ry + rowH;
+				boolean hover = r.enabled() && mouseX >= x + 4 && mouseX <= x + w - 4 && mouseY >= ry
+						&& mouseY <= ry + rowH - 1;
 				if (hover) {
-					context.fill(x, ry, x + w, ry + rowH, CARD_HOVER);
+					UIRenderer.fillRoundedRect(context, x + 4, ry, w - 8, rowH - 1, 3, CARD_HOVER);
 				} else if (r.active()) {
-					context.fill(x, ry, x + w, ry + rowH, CARD);
+					UIRenderer.fillRoundedRect(context, x + 4, ry, w - 8, rowH - 1, 3, CARD);
 				}
 				int col = !r.enabled() ? DIM : r.active() ? ACCENT : TEXT;
-				context.drawText(textRenderer, r.label(), x + 12, ry + (rowH - 8) / 2, col, false);
-				int tagW = textRenderer.getWidth(r.tag());
-				context.drawText(textRenderer, r.tag(), x + w - 12 - tagW, ry + (rowH - 8) / 2,
-						!r.enabled() ? DIM : ACCENT, false);
+				int ty = ry + (rowH - capH()) / 2;
+				txt(context, r.label(), x + pad + 2, ty, col, false);
+				int tagCol = !r.enabled() ? DIM : r.active() ? ACCENT : HEADER;
+				txt(context, r.tag(), x + w - pad - 2 - txtW(r.tag(), false), ty, tagCol, false);
 				if (r.enabled()) {
-					clickables.add(new Clickable(x, ry, x + w, ry + rowH, r.action()));
+					clickables.add(new Clickable(x + 4, ry, x + w - 4, ry + rowH, r.action()));
 				}
 				ry += rowH;
 			}
 		}
 
-		// "Nahe NPCs anzeigen" – schreibt Namen + IDs in den Chat.
-		int bw = w - 24;
-		int bh = 20;
-		int bx = x + 12;
-		int dy0 = y + h - footH + 5;
-		boolean dhover = mouseX >= bx && mouseX <= bx + bw && mouseY >= dy0 && mouseY <= dy0 + bh;
-		context.fill(bx, dy0, bx + bw, dy0 + bh, dhover ? CARD_HOVER : CARD);
-		String dump = "Nahe NPCs anzeigen (Namen + IDs in Chat)";
-		int dw = textRenderer.getWidth(dump);
-		context.drawText(textRenderer, dump, bx + (bw - dw) / 2, dy0 + (bh - 8) / 2, TEXT, false);
-		clickables.add(new Clickable(bx, dy0, bx + bw, dy0 + bh, () -> {
+		// Footer: nahe NPCs anzeigen + Navigation abbrechen.
+		int bw = w - pad * 2;
+		int bx = x + pad;
+		int dy0 = y + h - footH + 2;
+		card(context, bx, dy0, bw, btnH, mouseX, mouseY, "Nahe NPCs anzeigen", TEXT, () -> {
 			CrystalNav.dumpNearby();
 			close();
-		}));
-
-		// Abbrechen-Knopf (hebt CH- und manuelles Mining-Ziel auf).
+		});
 		boolean anyTarget = CrystalNav.hasTarget() || MiningWaypoints.hasManual();
-		int by = dy0 + bh + 4;
-		boolean chover = anyTarget && mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + bh;
-		context.fill(bx, by, bx + bw, by + bh, chover ? 0xFF7A2A26 : 0xFF40201E);
-		String cancel = anyTarget ? "Navigation abbrechen" : "Keine Navigation aktiv";
-		int cw = textRenderer.getWidth(cancel);
-		context.drawText(textRenderer, cancel, bx + (bw - cw) / 2, by + (bh - 8) / 2, anyTarget ? RED : DIM, false);
+		int by = dy0 + btnH + 4;
 		if (anyTarget) {
-			clickables.add(new Clickable(bx, by, bx + bw, by + bh, () -> {
+			card(context, bx, by, bw, btnH, mouseX, mouseY, "Navigation abbrechen", RED, () -> {
 				CrystalNav.cancel();
 				MiningWaypoints.clearManual();
 				close();
-			}));
+			});
+		} else {
+			UIRenderer.fillRoundedRect(context, bx, by, bw, btnH, 3, CARD);
+			txt(context, "Keine Navigation aktiv", bx + (bw - txtW("Keine Navigation aktiv", false)) / 2,
+					by + (btnH - capH()) / 2, DIM, false);
 		}
+	}
+
+	/** Klickbare, gerundete Karte mit zentriertem Text. */
+	private void card(DrawContext c, int x, int y, int w, int h, int mouseX, int mouseY, String label, int col,
+			Runnable action) {
+		boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+		UIRenderer.fillRoundedRect(c, x, y, w, h, 3, hover ? CARD_HOVER : CARD);
+		txt(c, label, x + (w - txtW(label, false)) / 2, y + (h - capH()) / 2, col, false);
+		clickables.add(new Clickable(x, y, x + w, y + h, action));
+	}
+
+	// ---- Text-Hilfen (HUD-Schrift mit Fallback) ---------------------------
+
+	private void txt(DrawContext c, String s, int x, int yTop, int color, boolean bold) {
+		if (!MidgardText.draw(c, s, x, yTop, 9f, color, bold)) {
+			c.drawText(textRenderer, bold ? Fonts.bold(s) : Fonts.regular(s), x, yTop, color, false);
+		}
+	}
+
+	private int txtW(String s, boolean bold) {
+		int w = MidgardText.width(s, 9f, bold);
+		return w >= 0 ? w : textRenderer.getWidth(bold ? Fonts.bold(s) : Fonts.regular(s));
+	}
+
+	private int capH() {
+		int h = MidgardText.capHeight(9f, false);
+		return h > 0 ? h : 7;
 	}
 
 	@Override
