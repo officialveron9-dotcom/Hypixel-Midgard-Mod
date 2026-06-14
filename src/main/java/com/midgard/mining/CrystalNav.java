@@ -200,10 +200,20 @@ public final class CrystalNav {
 	/** Zielkoordinate {x,y,z}: exakt (gelernt) oder ungefähr (Gebiet), sonst null. */
 	public static double[] target() {
 		int[] p = targetPos;
-		if (p == null && targetName != null) {
-			p = APPROX.get(targetName); // noch nicht geladen -> Richtung zum Gebiet
+		if (p != null) {
+			return new double[] { p[0], p[1], p[2] }; // exakt (NPC geladen)
 		}
-		return p == null ? null : new double[] { p[0], p[1], p[2] };
+		if (targetName != null) {
+			int[] ap = APPROX.get(targetName);
+			if (ap != null) {
+				// Ungefähr: XZ vom Gebiet, aber Y vom SPIELER -> der Pfad bleibt am
+				// Boden Richtung Gebiet, statt zu einem hohen Punkt hochzufliegen.
+				MinecraftClient mc = MinecraftClient.getInstance();
+				double py = mc.player != null ? mc.player.getY() : ap[1];
+				return new double[] { ap[0], py, ap[2] };
+			}
+		}
+		return null;
 	}
 
 	/** Ist die Zielposition EXAKT bekannt (NPC geladen)? Sonst nur ungefähr. */
