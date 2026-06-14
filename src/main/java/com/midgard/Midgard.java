@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15l (3D-Text via submitLabel=neue Engine-API + Leucht-Strahlen am Ziel)");
+		System.out.println("[Midgard] init build=2026-06-15m (Text groesser+lesbar, Beam weg, Linie folgt enger dem Boden)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -82,8 +82,6 @@ public class Midgard implements ClientModInitializer {
 				if (config != null && config.miningPathLine) {
 					com.midgard.util.PathRenderer.render(ctx);
 				}
-				// Leucht-Strahlen an den Zielen (durch Wände sichtbar = klare Richtung).
-				com.midgard.util.PathRenderer.renderBeams(ctx, com.midgard.mining.MiningWaypoints.markers());
 			} catch (Throwable t) {
 				logOnce("Pfad3D", t);
 			}

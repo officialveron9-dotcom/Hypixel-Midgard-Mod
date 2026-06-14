@@ -65,8 +65,12 @@ public final class WorldTextRenderer {
 						.setStyle(Style.EMPTY.withColor(TextColor.fromRgb(m.color() & 0xFFFFFF)));
 				text.append(Text.literal("  " + dist + "m").formatted(Formatting.GRAY));
 
+				// Größe wächst mit der Entfernung -> Label bleibt von weitem lesbar
+				// (konstante Bildschirmgröße statt winzig).
+				float scale = (float) Math.max(1.6, dist / 9.0);
 				ms.push();
 				ms.translate(dx, dy, dz);
+				ms.scale(scale, scale, scale);
 				// matrices an der Marker-Position, pos=ZERO, bg=0, seeThrough=true,
 				// light=full bright, distSq, Kamera-Zustand.
 				queue.submitLabel(ms, Vec3d.ZERO, 0, text, true, 0xF000F0, dsq, crs);

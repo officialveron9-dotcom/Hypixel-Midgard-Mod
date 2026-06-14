@@ -210,8 +210,8 @@ public final class PathFinder {
 		return simplify(world, pts);
 	}
 
-	/** Wie stark vereinfacht wird (Blöcke). Größer = gerader, weniger Stützpunkte. */
-	private static final double DP_EPS = 1.3;
+	/** Wie stark vereinfacht wird (Blöcke). Kleiner = folgt enger dem Boden/Stufen. */
+	private static final double DP_EPS = 0.55;
 
 	private static List<Vec3d> simplify(ClientWorld world, List<Vec3d> pts) {
 		int sz = pts.size();
