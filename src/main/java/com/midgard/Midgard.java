@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15j (Wegfinder=echtes Laufen: gehen/springen/fallen, kein Fliegen, nie durch Bloecke)");
+		System.out.println("[Midgard] init build=2026-06-15k (3D-Text Versuch 4: andere Billboard-Rotation + Alpha FF erzwungen)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -84,6 +84,12 @@ public class Midgard implements ClientModInitializer {
 				}
 			} catch (Throwable t) {
 				logOnce("Pfad3D", t);
+			}
+			// Wegpunkt-Labels als 3D-Billboard-Text (wie Skyblocker).
+			try {
+				com.midgard.util.WorldTextRenderer.render(ctx, com.midgard.mining.MiningWaypoints.markers());
+			} catch (Throwable t) {
+				logOnce("Text3D", t);
 			}
 		});
 
@@ -214,13 +220,6 @@ public class Midgard implements ClientModInitializer {
 					com.midgard.events.hud.MinimapHud.INSTANCE.render(context);
 				} catch (Throwable t) {
 					logOnce("Minimap", t);
-				}
-				// Wegpunkt-Marker (Name + Entfernung) als 2D-Labels – die zeigen
-				// zuverlässig Text an (3D-Text rendert in dieser MC-Version nicht).
-				try {
-					com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
-				} catch (Throwable t) {
-					logOnce("Wegpunkte", t);
 				}
 			}
 			try {
