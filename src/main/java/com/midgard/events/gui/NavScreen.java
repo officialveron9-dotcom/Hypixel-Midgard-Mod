@@ -50,7 +50,7 @@ public class NavScreen extends Screen {
 		int rowH = 20;
 		int n = CrystalNav.LOCATIONS.size();
 		int headH = 26;
-		int footH = 30;
+		int footH = 56;
 		int h = headH + n * rowH + footH;
 		int x = (this.width - w) / 2;
 		int y = (this.height - h) / 2;
@@ -84,11 +84,23 @@ public class NavScreen extends Screen {
 			ry += rowH;
 		}
 
-		// Abbrechen-Knopf.
+		// "Nahe NPCs anzeigen" – schreibt Namen + IDs in den Chat.
 		int bw = w - 24;
 		int bh = 20;
 		int bx = x + 12;
-		int by = y + h - footH + 5;
+		int dy0 = y + h - footH + 5;
+		boolean dhover = mouseX >= bx && mouseX <= bx + bw && mouseY >= dy0 && mouseY <= dy0 + bh;
+		context.fill(bx, dy0, bx + bw, dy0 + bh, dhover ? CARD_HOVER : CARD);
+		String dump = "Nahe NPCs anzeigen (Namen + IDs in Chat)";
+		int dw = textRenderer.getWidth(dump);
+		context.drawText(textRenderer, dump, bx + (bw - dw) / 2, dy0 + (bh - 8) / 2, TEXT, false);
+		clickables.add(new Clickable(bx, dy0, bx + bw, dy0 + bh, () -> {
+			CrystalNav.dumpNearby();
+			close();
+		}));
+
+		// Abbrechen-Knopf.
+		int by = dy0 + bh + 4;
 		boolean chover = mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + bh;
 		context.fill(bx, by, bx + bw, by + bh, chover ? 0xFF7A2A26 : 0xFF40201E);
 		String cancel = CrystalNav.hasTarget() ? "Navigation abbrechen (" + CrystalNav.targetName() + ")"

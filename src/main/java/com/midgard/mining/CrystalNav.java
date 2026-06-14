@@ -5,10 +5,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import java.util.ArrayList;
+
 import com.midgard.events.skyblock.ScoreboardReader;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 /**
  * Crystal-Hollows-Navi: Crystal Hollows wird pro Instanz ZUFÄLLIG generiert,
@@ -129,6 +133,48 @@ public final class CrystalNav {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Schreibt die Namen + Entity-IDs der benannten NPCs/Mobs in der Nähe in den
+	 * lokalen Chat (nur Anzeige) – damit man dem Entwickler die exakten Namen/IDs
+	 * nennen kann, um neue Orte/Bosse fest einzutragen.
+	 */
+	public static void dumpNearby() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (mc.player == null || mc.world == null) {
+			return;
+		}
+		double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
+		List<String> lines = new ArrayList<>();
+		for (Entity e : mc.world.getEntities()) {
+			if (e.getName() == null) {
+				continue;
+			}
+			String en = ScoreboardReader.stripFormatting(e.getName().getString());
+			if (en.length() < 2 || !en.matches(".*[A-Za-z].*") || en.startsWith("[")) {
+				continue;
+			}
+			double dx = e.getX() - px, dy = e.getY() - py, dz = e.getZ() - pz;
+			double d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+			if (d > 30) {
+				continue;
+			}
+			lines.add(en + "  (id=" + e.getId() + ", " + Math.round(e.getX()) + "/"
+					+ Math.round(e.getY()) + "/" + Math.round(e.getZ()) + ", " + Math.round(d) + "m)");
+			if (lines.size() >= 25) {
+				break;
+			}
+		}
+		mc.player.sendMessage(Text.literal("[Midgard] NPCs/Mobs in der Nähe (" + lines.size() + "):")
+				.formatted(Formatting.GOLD), false);
+		for (String l : lines) {
+			mc.player.sendMessage(Text.literal(" - " + l).formatted(Formatting.YELLOW), false);
+		}
+		if (lines.isEmpty()) {
+			mc.player.sendMessage(Text.literal("  (nichts in der Nähe – näher rangehen)").formatted(Formatting.GRAY),
+					false);
+		}
 	}
 
 	public static boolean isLearned(String name) {
