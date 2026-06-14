@@ -60,11 +60,18 @@ public final class AuctionSearchScreen extends Screen {
 
 	@Override
 	protected void init() {
+		System.out.println("[Midgard] AuctionSearchScreen.init() – Menue ist offen.");
 		ItemIndex.INSTANCE.ensureLoaded();
 		if (Midgard.config != null) {
 			stars = Math.max(0, Math.min(10, Midgard.config.auctionStars));
 		}
 		recompute();
+	}
+
+	@Override
+	public void removed() {
+		System.out.println("[Midgard] AuctionSearchScreen.removed() – Menue wird geschlossen.");
+		super.removed();
 	}
 
 	@Override

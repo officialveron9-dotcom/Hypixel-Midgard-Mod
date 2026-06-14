@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15y (Auktions-Suche: eigenes Menue statt Hypixel-Schild - Live-Vorschlaege, Verlauf, Sterne)");
+		System.out.println("[Midgard] init build=2026-06-15z (Auktions-Suche Fix: Tick-Verzoegerung statt sofort umschalten + Lifecycle-Log)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

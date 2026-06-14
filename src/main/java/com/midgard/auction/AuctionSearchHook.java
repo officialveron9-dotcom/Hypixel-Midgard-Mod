@@ -4,20 +4,22 @@ import java.util.Locale;
 
 import com.midgard.Midgard;
 
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.AbstractSignEditScreen;
 
 /**
  * Fängt das Hypixel-Auktionshaus-Such-SCHILD ab und ersetzt es durch das eigene
- * {@link AuctionSearchScreen}. Hypixel öffnet für die AH-Suche ein
- * Schild-Bearbeitungs-Fenster; sobald das erkannt wird, schalten wir auf unser
- * Menü um. Defensiv: erkennt nur das Such-Schild (Stichwörter), und nur wenn die
- * Funktion in der Config aktiv ist.
+ * {@link AuctionSearchScreen}. Wichtig: das Umschalten passiert NICHT während
+ * der Screen-Initialisierung (sonst schließt es sich sofort wieder), sondern
+ * sauber im nächsten Client-Tick.
  */
 public final class AuctionSearchHook {
 
 	private static String lastLoggedKey = "";
+	private static volatile AbstractSignEditScreen pending;
 
 	private AuctionSearchHook() {
 	}
@@ -32,16 +34,29 @@ public final class AuctionSearchHook {
 			if (Midgard.config == null || !Midgard.config.auctionSearch) {
 				return;
 			}
-			if (!isAhSearch(lines)) {
+			if (isAhSearch(lines)) {
+				System.out.println("[Midgard] AH-Suche erkannt -> oeffne eigenes Menue im naechsten Tick.");
+				pending = sign; // erst nächsten Tick umschalten
+			}
+		});
+
+		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			AbstractSignEditScreen sign = pending;
+			if (sign == null) {
 				return;
 			}
-			ItemIndex.INSTANCE.ensureLoaded();
-			// Nicht mitten in AFTER_INIT umschalten -> auf den nächsten Tick legen.
-			client.send(() -> {
-				if (client.currentScreen == screen) {
-					client.setScreen(new AuctionSearchScreen(sign));
-				}
-			});
+			pending = null;
+			// Nur umschalten, wenn noch das Schild (oder gar nichts) offen ist –
+			// nicht, wenn Hypixel inzwischen einen anderen Screen geöffnet hat.
+			Screen cur = client.currentScreen;
+			if (cur == sign || cur == null || cur instanceof AbstractSignEditScreen) {
+				System.out.println("[Midgard] -> AuctionSearchScreen wird gesetzt (vorher: "
+						+ (cur == null ? "null" : cur.getClass().getSimpleName()) + ")");
+				client.setScreen(new AuctionSearchScreen(sign));
+			} else {
+				System.out.println("[Midgard] -> nicht umgeschaltet, aktueller Screen: "
+						+ cur.getClass().getSimpleName());
+			}
 		});
 	}
 
@@ -58,12 +73,10 @@ public final class AuctionSearchHook {
 	/** Ist das das AH-Such-Schild? Defensiv über Stichwörter in den Zeilen. */
 	static boolean isAhSearch(String[] lines) {
 		String joined = joinStripped(lines);
-		// Hypixel-Such-Schild hat eine Pfeil-Zeile (^^^) plus einen Hinweis wie
-		// "Search" / "Query" / "Auction". Defensiv mehrere Varianten matchen.
-		boolean arrow = joined.contains("^^^");
 		boolean kw = joined.contains("search") || joined.contains("query")
-				|| joined.contains("auction") || joined.contains("suche");
-		return arrow && kw || kw;
+				|| joined.contains("auction") || joined.contains("suche")
+				|| joined.contains("^^^");
+		return kw;
 	}
 
 	private static String joinStripped(String[] lines) {
@@ -93,5 +106,9 @@ public final class AuctionSearchHook {
 			System.out.println("[Midgard] Sign-Screen erkannt, Zeilen=" + key
 					+ "  -> AH-Suche? " + isAhSearch(lines));
 		}
+	}
+
+	static MinecraftClient mc() {
+		return MinecraftClient.getInstance();
 	}
 }
