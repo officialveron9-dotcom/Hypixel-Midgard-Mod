@@ -196,7 +196,7 @@ public final class PathFinder {
 	}
 
 	/** Maximale Länge eines geraden Abschnitts (Blöcke), bevor ein Stützpunkt bleibt. */
-	private static final double MAX_RUN = 6.0;
+	private static final double MAX_RUN = 12.0;
 
 	private static List<Vec3d> simplify(ClientWorld world, List<Vec3d> pts) {
 		int sz = pts.size();

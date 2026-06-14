@@ -35,7 +35,6 @@ public final class PathRenderer {
 
 	private static final int R = 245, G = 130, B = 50; // Akzent-Orange
 	private static final int MAX_SEG = 240;
-	private static final int SAMPLES = 7; // Spline-Punkte je Knotenabschnitt
 
 	private static BufferAllocator allocator;
 	private static VertexConsumerProvider.Immediate immediate;
@@ -104,52 +103,51 @@ public final class PathRenderer {
 		MatrixStack.Entry entry = ms.peek();
 		Matrix4f m = entry.getPositionMatrix();
 
+		// Gerade Segmente direkt zwischen den (bereits vereinfachten) Punkten –
+		// kein Spline mehr, dadurch keine Wellen. Punkt-zu-Punkt schnurgerade.
 		if (style == 2) {
-			// Würfel-Spur an den (ungeglätteten) Knoten.
+			// Würfel-Spur an den Knoten.
 			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
 			for (int i = 1; i < raw.size(); i++) {
 				box(vc, m, raw.get(i), 0.11f, 200);
 			}
 		} else if (style == 5) {
-			// Leucht-Blöcke: die Bodenblöcke entlang der Route leuchten (grid-genau).
+			// Leucht-Blöcke: der ECHTE Bodenblock (auf dem man läuft) glüht als
+			// Ganzes – kein schwebendes Extra-Element, sondern der Block selbst.
 			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
-			List<Vec3d> curve = smoothCurve(raw, SAMPLES);
 			Set<Long> seen = new HashSet<>();
-			for (Vec3d p : curve) {
+			for (Vec3d p : densify(raw, 0.4)) {
 				int bx = (int) Math.floor(p.x);
 				int bz = (int) Math.floor(p.z);
-				float topY = (float) (p.y - 0.06); // Oberkante des Bodenblocks
-				int by = Math.round(topY);
-				if (!seen.add(net.minecraft.util.math.BlockPos.asLong(bx, by, bz))) {
+				int feetY = (int) Math.floor(p.y - 0.08);
+				int floorY = feetY - 1; // der feste Block unter den Füßen
+				if (!seen.add(net.minecraft.util.math.BlockPos.asLong(bx, floorY, bz))) {
 					continue;
 				}
-				glowTile(vc, m, bx, topY, bz, 0.03f, 60);
-				glowTile(vc, m, bx, topY + 0.002f, bz, 0.27f, 170);
+				Vec3d c = new Vec3d(bx + 0.5, floorY + 0.5, bz + 0.5);
+				box(vc, m, c, 0.5f - 0.03f, 80); // ganzer Block, leicht durchscheinend -> glüht
+			}
+		} else if (style == 0) {
+			// Tiefengetestete Linie – von Blöcken verdeckt.
+			VertexConsumer vc = immediate.getBuffer(RenderLayers.LINES);
+			for (int i = 0; i + 1 < raw.size(); i++) {
+				line(vc, entry, m, raw.get(i), raw.get(i + 1), 6f, 255);
+			}
+		} else if (style == 4) {
+			// Boden-Glühen: Band flach auf dem Boden (zwei Lagen für Glow).
+			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
+			for (int i = 0; i + 1 < raw.size(); i++) {
+				floorBand(vc, m, raw.get(i), raw.get(i + 1), 0.46f, 70);
+			}
+			for (int i = 0; i + 1 < raw.size(); i++) {
+				floorBand(vc, m, raw.get(i), raw.get(i + 1), 0.17f, 185);
 			}
 		} else {
-			List<Vec3d> curve = smoothCurve(raw, SAMPLES);
-			if (style == 0) {
-				// Tiefengetestete Linie – von Blöcken verdeckt.
-				VertexConsumer vc = immediate.getBuffer(RenderLayers.LINES);
-				for (int i = 0; i + 1 < curve.size(); i++) {
-					line(vc, entry, m, curve.get(i), curve.get(i + 1), 6f, 255);
-				}
-			} else if (style == 4) {
-				// Boden-Glühen: weiche Spur flach auf dem Boden (zwei Lagen für Glow).
-				VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
-				for (int i = 0; i + 1 < curve.size(); i++) {
-					floorBand(vc, m, curve.get(i), curve.get(i + 1), 0.46f, 70);
-				}
-				for (int i = 0; i + 1 < curve.size(); i++) {
-					floorBand(vc, m, curve.get(i), curve.get(i + 1), 0.17f, 185);
-				}
-			} else {
-				// Band (durch Wände): breit (1) oder dünn (3).
-				float tH = style == 3 ? 0.05f : 0.14f;
-				VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
-				for (int i = 0; i + 1 < curve.size(); i++) {
-					tube(vc, m, curve.get(i), curve.get(i + 1), tH, 0.04f, 200);
-				}
+			// Band (durch Wände): breit (1) oder dünn (3).
+			float tH = style == 3 ? 0.05f : 0.14f;
+			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
+			for (int i = 0; i + 1 < raw.size(); i++) {
+				tube(vc, m, raw.get(i), raw.get(i + 1), tH, 0.04f, 200);
 			}
 		}
 
@@ -159,36 +157,23 @@ public final class PathRenderer {
 
 	// ---- Glättung ---------------------------------------------------------
 
-	/** Verdichtet die Knoten per Catmull-Rom-Spline zu einer weichen Kurve. */
-	private static List<Vec3d> smoothCurve(List<Vec3d> pts, int samples) {
-		int sz = pts.size();
-		if (sz < 3) {
+	/** Punkte linear entlang der geraden Strecke verdichten (für die Leucht-Blöcke). */
+	private static List<Vec3d> densify(List<Vec3d> pts, double stepLen) {
+		if (pts.size() < 2) {
 			return pts;
 		}
-		List<Vec3d> out = new ArrayList<>(sz * samples);
-		for (int i = 0; i < sz - 1; i++) {
-			Vec3d p0 = pts.get(Math.max(0, i - 1));
-			Vec3d p1 = pts.get(i);
-			Vec3d p2 = pts.get(i + 1);
-			Vec3d p3 = pts.get(Math.min(sz - 1, i + 2));
-			for (int s = 0; s < samples; s++) {
-				double t = s / (double) samples;
-				out.add(catmull(p0, p1, p2, p3, t));
+		List<Vec3d> out = new ArrayList<>();
+		for (int i = 0; i + 1 < pts.size(); i++) {
+			Vec3d a = pts.get(i), b = pts.get(i + 1);
+			double dist = a.distanceTo(b);
+			int steps = Math.max(1, (int) (dist / stepLen));
+			for (int s = 0; s < steps; s++) {
+				double t = (double) s / steps;
+				out.add(new Vec3d(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t));
 			}
 		}
-		out.add(pts.get(sz - 1));
+		out.add(pts.get(pts.size() - 1));
 		return out;
-	}
-
-	private static Vec3d catmull(Vec3d p0, Vec3d p1, Vec3d p2, Vec3d p3, double t) {
-		double t2 = t * t, t3 = t2 * t;
-		double x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2
-				+ (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-		double y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
-				+ (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
-		double z = 0.5 * ((2 * p1.z) + (-p0.z + p2.z) * t + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2
-				+ (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3);
-		return new Vec3d(x, y, z);
 	}
 
 	// ---- Primitive --------------------------------------------------------
@@ -204,15 +189,6 @@ public final class PathRenderer {
 		// Format POSITION_COLOR_NORMAL_LINE_WIDTH -> exakt diese Reihenfolge.
 		vc.vertex(m, (float) a.x, (float) a.y, (float) a.z).color(R, G, B, alpha).normal(e, nx, ny, nz).lineWidth(w);
 		vc.vertex(m, (float) b.x, (float) b.y, (float) b.z).color(R, G, B, alpha).normal(e, nx, ny, nz).lineWidth(w);
-	}
-
-	/** Leuchtende Platte über einem ganzen Block (bx,bz) auf Höhe y. */
-	private static void glowTile(VertexConsumer vc, Matrix4f m, int bx, float y, int bz, float inset, int alpha) {
-		float x0 = bx + inset, x1 = bx + 1 - inset;
-		float z0 = bz + inset, z1 = bz + 1 - inset;
-		float[] p1 = { x0, y, z0 }, p2 = { x1, y, z0 }, p3 = { x1, y, z1 }, p4 = { x0, y, z1 };
-		quad(vc, m, p1, p2, p3, p4, alpha); // Oberseite
-		quad(vc, m, p4, p3, p2, p1, alpha); // Unterseite (auch von unten sichtbar)
 	}
 
 	/** Flaches, waagerechtes Band auf dem Boden (für das Boden-Glühen). */

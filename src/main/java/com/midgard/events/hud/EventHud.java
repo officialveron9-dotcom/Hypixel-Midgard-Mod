@@ -105,6 +105,26 @@ public class EventHud {
 		draw(context, Midgard.config, collect(Midgard.config, events, true), true);
 	}
 
+	/**
+	 * Bildschirm-Rechteck eines Live-HUD-Elements (oder null, wenn es gerade nicht
+	 * sichtbar ist). Für anklickbare HUD-Elemente bei offenem Chat.
+	 */
+	public GroupRect liveRect(ModConfig cfg, String key) {
+		if (!cfg.masterEnabled) {
+			return null;
+		}
+		if (cfg.onlyOnSkyblock && !SkyblockHook.INSTANCE.onSkyblock) {
+			return null;
+		}
+		List<HudGroup> groups = collect(cfg, EventManager.INSTANCE.get(), false);
+		for (GroupRect r : layout(cfg, groups)) {
+			if (r.key().equals(key)) {
+				return r;
+			}
+		}
+		return null;
+	}
+
 	/** Alle Gruppen für den HUD-Editor (Events-Vorschau + Garden-Vorschau). */
 	public List<GroupRect> layoutPreview(ModConfig cfg, List<EventDisplay> events) {
 		return layout(cfg, collect(cfg, events, true));

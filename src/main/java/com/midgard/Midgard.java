@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14t (Pfad vereinfacht+Leucht-Bloecke-Stil, Navi-Ziel im HUD, Fadenkreuz-Navi)");
+		System.out.println("[Midgard] init build=2026-06-14u (Pfad schnurgerade ohne Spline, echte Block-Highlights, Navi per Chat-Klick)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -92,6 +92,32 @@ public class Midgard implements ClientModInitializer {
 			} catch (Throwable t) {
 				logOnce("Pfad3D", t);
 			}
+		});
+
+		// HUD-Elemente bei OFFENEM CHAT anklickbar: dann gibt es einen Mauszeiger
+		// und das HUD wird hinter dem Chat gezeichnet. Klick auf das Navi-Element
+		// öffnet die Ziel-Auswahl (sonst macht der Klick im Chat-Bereich nichts).
+		net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
+			if (!(screen instanceof net.minecraft.client.gui.screen.ChatScreen)) {
+				return;
+			}
+			net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen)
+					.register((scr, click) -> {
+						if (click.button() != 0 || config == null) {
+							return true;
+						}
+						try {
+							EventHud.GroupRect r =
+									EventHud.INSTANCE.liveRect(config, com.midgard.mining.MiningHud.KEY_NAV);
+							if (r != null && r.contains(click.x(), click.y())) {
+								client.setScreen(new com.midgard.events.gui.NavScreen(null));
+								return false; // Klick verbraucht (nicht an den Chat)
+							}
+						} catch (Throwable t) {
+							logOnce("ChatKlick", t);
+						}
+						return true;
+					});
 		});
 
 		// Chat-Nachrichten an den Live-Event-Tracker weitergeben (nur lesen, nie senden).
