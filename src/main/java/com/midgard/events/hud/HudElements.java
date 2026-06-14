@@ -43,6 +43,7 @@ public final class HudElements {
 			new Element(MiningHud.KEY_EVENT, "Mining-Event", Location.MINING, true),
 			new Element(MiningHud.KEY_POWDER, "Powder", Location.MINING, true),
 			new Element(MiningHud.KEY_CRYSTALS, "Kristalle (CH)", Location.MINING, true),
+			new Element(MiningHud.KEY_MINIMAP, "Mini-Karte (CH)", Location.MINING, true),
 			new Element(MiningHud.KEY_NAV, "Navi", Location.MINING, true));
 
 	private HudElements() {

@@ -43,9 +43,13 @@ public final class WorldMarkers {
 		Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
 		Quaternionf rot = mc.gameRenderer.getCamera().getRotation();
 		TextRenderer tr = mc.textRenderer;
-		// Entity-Puffer des Spiels nutzen – der zeichnet die Schrift-Layer korrekt
-		// (eigener Puffer rendert Text-Layer oft nicht). draw() flusht nur unseres.
-		VertexConsumerProvider.Immediate immediate = mc.getBufferBuilders().getEntityVertexConsumers();
+		// WICHTIG: den GETEILTEN Welt-Puffer (ctx.consumers()) nutzen, den die
+		// Engine selbst flusht – NICHT selbst draw() aufrufen. So macht es auch
+		// Skyblocker. (Ein eigener Puffer rendert die Schrift-Layer nicht.)
+		VertexConsumerProvider consumers = ctx.consumers();
+		if (consumers == null) {
+			return;
+		}
 
 		for (Marker m : markers) {
 			try {
@@ -65,15 +69,15 @@ public final class WorldMarkers {
 				String name = m.label();
 				String distLine = Math.round(dist) + "m";
 				int light = 0xF000F0;
-				tr.draw(name, -tr.getWidth(name) / 2f, -10f, m.color(), true, mat, immediate,
+				tr.draw(name, -tr.getWidth(name) / 2f, -10f, m.color(), true, mat, consumers,
 						TextRenderer.TextLayerType.SEE_THROUGH, 0, light);
-				tr.draw(distLine, -tr.getWidth(distLine) / 2f, 0f, 0xFFFFFFFF, true, mat, immediate,
+				tr.draw(distLine, -tr.getWidth(distLine) / 2f, 0f, 0xFFFFFFFF, true, mat, consumers,
 						TextRenderer.TextLayerType.SEE_THROUGH, 0, light);
 				ms.pop();
 			} catch (Throwable ignored) {
 				// einzelner Marker darf nie alles abreißen
 			}
 		}
-		immediate.draw();
+		// KEIN draw() – die Engine flusht ctx.consumers() selbst.
 	}
 }

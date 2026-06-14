@@ -8,6 +8,7 @@ import com.midgard.events.skyblock.ScoreboardReader;
 import com.midgard.mining.CrystalMap;
 import com.midgard.mining.CrystalNav;
 import com.midgard.mining.MiningData;
+import com.midgard.mining.MiningHud;
 import com.midgard.render.MidgardText;
 import com.midgard.render.UIRenderer;
 
@@ -41,7 +42,8 @@ public final class MinimapHud {
 
 	public void render(DrawContext c) {
 		ModConfig cfg = Midgard.config;
-		if (cfg == null || !cfg.masterEnabled || !cfg.chMinimap || !MiningData.INSTANCE.onCrystalHollows) {
+		if (cfg == null || !cfg.masterEnabled || !cfg.isElementEnabled(MiningHud.KEY_MINIMAP)
+				|| !MiningData.INSTANCE.onCrystalHollows) {
 			return;
 		}
 		MinecraftClient mc = MinecraftClient.getInstance();
@@ -49,8 +51,12 @@ public final class MinimapHud {
 			return;
 		}
 		int sw = mc.getWindow().getScaledWidth();
-		int x = sw - SIZE - 6;
-		int y = 6;
+		int sh = mc.getWindow().getScaledHeight();
+		// Position: im Editor verschiebbar (Gruppen-Position), sonst oben rechts.
+		int x = cfg.hasGroupPos(MiningHud.KEY_MINIMAP) ? cfg.groupX(MiningHud.KEY_MINIMAP) : sw - SIZE - 6;
+		int y = cfg.hasGroupPos(MiningHud.KEY_MINIMAP) ? cfg.groupY(MiningHud.KEY_MINIMAP) : 6;
+		x = Math.max(2, Math.min(x, sw - SIZE - 2));
+		y = Math.max(2, Math.min(y, sh - SIZE - 16));
 
 		UIRenderer.fillRoundedRect(c, x - 1, y - 1, SIZE + 2, SIZE + 2, 4, BORDER);
 		UIRenderer.fillRoundedRect(c, x, y, SIZE, SIZE, 3, PANEL);
@@ -61,12 +67,19 @@ public final class MinimapHud {
 		} else {
 			renderFallback(c, x, y, mc);
 		}
-		// Aktuelles Biom unten anzeigen (aus dem Scoreboard).
+		// Aktuelles Biom als eigenes Feld UNTER der Karte (nicht in der Karte).
 		String area = ScoreboardReader.currentArea(mc);
 		if (area != null && !area.isEmpty()) {
-			c.fill(x, y + SIZE - 12, x + SIZE, y + SIZE, 0xAA000000);
-			txt(c, area, x + 4, y + SIZE - 10, 0xFFFFFFFF, mc);
+			int ly = y + SIZE + 3;
+			UIRenderer.fillRoundedRect(c, x - 1, ly - 1, SIZE + 2, 14, 4, BORDER);
+			UIRenderer.fillRoundedRect(c, x, ly, SIZE, 12, 3, PANEL);
+			txt(c, area, x + (SIZE - txtW(area, mc)) / 2, ly + 2, 0xFFFFFFFF, mc);
 		}
+	}
+
+	private int txtW(String s, MinecraftClient mc) {
+		int w = MidgardText.width(s, 8f, true);
+		return w >= 0 ? w : mc.textRenderer.getWidth(s);
 	}
 
 	// ---- Variante MIT echter CH-Karte -------------------------------------

@@ -43,6 +43,16 @@ public final class CrystalNav {
 
 	private static final int[] NUCLEUS = { 513, 125, 513 };
 
+	/**
+	 * Ungefähre Gebiets-Mitte je Ziel, SOLANGE der NPC noch nicht geladen ist.
+	 * Die Amber-NPCs (King Yolkar, Goblin Guard) sind im Goblin Holdout = SW-
+	 * Quadrant (X&lt;512, Z&gt;512). So zeigt der Pfad schon die Richtung; sobald
+	 * der NPC in der Nähe lädt, übernimmt die exakte Position.
+	 */
+	private static final Map<String, int[]> APPROX = Map.of(
+			"King Yolkar", new int[] { 356, 140, 667 },
+			"Goblin Guard", new int[] { 356, 140, 667 });
+
 	private static final Map<String, int[]> learned = new HashMap<>();
 	private static volatile String targetName;
 	private static volatile int[] targetPos;
@@ -187,9 +197,17 @@ public final class CrystalNav {
 		return targetName;
 	}
 
-	/** Zielkoordinate {x,y,z} oder null. */
+	/** Zielkoordinate {x,y,z}: exakt (gelernt) oder ungefähr (Gebiet), sonst null. */
 	public static double[] target() {
 		int[] p = targetPos;
+		if (p == null && targetName != null) {
+			p = APPROX.get(targetName); // noch nicht geladen -> Richtung zum Gebiet
+		}
 		return p == null ? null : new double[] { p[0], p[1], p[2] };
+	}
+
+	/** Ist die Zielposition EXAKT bekannt (NPC geladen)? Sonst nur ungefähr. */
+	public static boolean targetExact() {
+		return targetPos != null;
 	}
 }

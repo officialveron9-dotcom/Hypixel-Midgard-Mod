@@ -28,6 +28,7 @@ public final class MiningHud {
 	public static final String KEY_POWDER = "MINING_POWDER";
 	public static final String KEY_NAV = "MINING_NAV";
 	public static final String KEY_CRYSTALS = "MINING_CRYSTALS";
+	public static final String KEY_MINIMAP = "MINING_MINIMAP";
 
 	private static final int GREEN = 0xFF5BE36B;
 	private static final int DIM = 0xFF9A9AA5;
@@ -127,6 +128,13 @@ public final class MiningHud {
 			List<HudRow> rows = new ArrayList<>();
 			rows.add(new HudRow("", "King Yolkar", GREEN, List.of(), false));
 			out.add(new HudGroup(KEY_NAV, "Navi", rows, Items.COMPASS));
+		}
+		// Mini-Karte (Crystal Hollows): im Spiel rendert MinimapHud selbst; im
+		// Editor eine kleine Box zum Positionieren.
+		if (preview && cfg.isElementEnabled(KEY_MINIMAP)) {
+			List<HudRow> rows = new ArrayList<>();
+			rows.add(new HudRow("", "Mini-Karte (CH)", DIM, List.of(), false));
+			out.add(new HudGroup(KEY_MINIMAP, "Karte", rows, Items.FILLED_MAP));
 		}
 
 		// 6) Kristalle (nur in Crystal Hollows): abgegeben / noch offen.
