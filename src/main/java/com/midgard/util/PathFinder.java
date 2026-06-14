@@ -194,7 +194,7 @@ public final class PathFinder {
 	}
 
 	/** Wie stark vereinfacht wird (Blöcke). Größer = gerader, weniger Stützpunkte. */
-	private static final double DP_EPS = 0.55;
+	private static final double DP_EPS = 1.3;
 
 	private static List<Vec3d> simplify(List<Vec3d> pts) {
 		int sz = pts.size();

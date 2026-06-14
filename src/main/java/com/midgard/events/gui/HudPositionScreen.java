@@ -244,7 +244,7 @@ public class HudPositionScreen extends Screen {
 					cfg.setUpcomingEvent(ev, cfg.getUpcomingEvent(ev) + 1);
 					cfg.save();
 				}));
-			} else if (!global) {
+			} else if (!global && !noScope(el.key())) {
 				// nur hier (Karte) / überall (Ender-Auge = Welt) – echte Item-Icons.
 				boolean gl = cfg.isElementGlobal(el.key());
 				int bx = rightX - bs;
@@ -260,17 +260,48 @@ public class HudPositionScreen extends Screen {
 			ry += rowH;
 		}
 
-		// Kompakte Legende unten in der Liste.
-		String legend = global
-				? "Kasten = an/aus · +/- = Anzahl · Uhr = Größe zurück · Rad = Größe"
-				: "Kasten = an/aus · Karte/Auge = nur hier/überall · Uhr = Größe zurück";
-		txt(context, legend, x + 12, ry + 8, TEXT_DIM, false);
+		// Legende mit echten Icons (zeigt, was die Symbole bedeuten).
+		int lx = x + 12;
+		int lty = ry + 9;
+		lx = legendBox(context, lx, lty, ON, "an/aus");
+		if (!global) {
+			lx = legendIcon(context, lx, lty, net.minecraft.item.Items.FILLED_MAP, "nur hier");
+			lx = legendIcon(context, lx, lty, net.minecraft.item.Items.ENDER_EYE, "überall");
+		}
+		lx = legendIcon(context, lx, lty, net.minecraft.item.Items.CLOCK, "Größe zurück");
+	}
+
+	/** Nur-hier/überall-Schalter ausblenden (Element ergibt nur am Standort Sinn). */
+	private static boolean noScope(String key) {
+		return key.equals(com.midgard.mining.MiningHud.KEY_NAV)
+				|| key.equals(com.midgard.mining.MiningHud.KEY_CRYSTALS);
+	}
+
+	/** Legenden-Eintrag: kleiner Farbkasten + Beschriftung. Gibt neue x-Position zurück. */
+	private int legendBox(DrawContext c, int x, int yTop, int color, String label) {
+		c.fill(x, yTop - 1, x + 9, yTop + 8, color);
+		int ix = x + 13;
+		txt(c, label, ix, yTop, TEXT_DIM, false);
+		return ix + txtW(label, false) + 10;
+	}
+
+	/** Legenden-Eintrag: Item-Icon + Beschriftung. Gibt neue x-Position zurück. */
+	private int legendIcon(DrawContext c, int x, int yTop, net.minecraft.item.Item item, String label) {
+		var ms = c.getMatrices();
+		ms.pushMatrix();
+		ms.translate(x, yTop - 3f);
+		ms.scale(0.7f, 0.7f);
+		c.drawItem(new net.minecraft.item.ItemStack(item), 0, 0);
+		ms.popMatrix();
+		int ix = x + 13;
+		txt(c, label, ix, yTop, TEXT_DIM, false);
+		return ix + txtW(label, false) + 10;
 	}
 
 	private void drawBack(DrawContext context, int mouseX, int mouseY) {
-		int w = 100, h = 22;
-		int x = (this.width - w) / 2;
-		int y = this.height - h - 10;
+		int w = 90, h = 20;
+		int x = 12;
+		int y = 12; // oben links, nicht mehr ganz unten
 		boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
 		sprite(context, x - 1, y - 1, w + 2, h + 2, BORDER);
 		sprite(context, x, y, w, h, hover ? 0xFFFF8A45 : ACCENT);

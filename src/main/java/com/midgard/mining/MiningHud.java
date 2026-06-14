@@ -120,7 +120,14 @@ public final class MiningHud {
 			out.add(new HudGroup(KEY_EVENT, "Mining-Event", rows, Items.GUNPOWDER));
 		}
 
-		// (Navi-Ziel-Auswahl liegt jetzt in NaviHud – eigene klickbare HUD-Liste.)
+		// Navi: im Spiel rendert NaviHud die klickbare Liste selbst. NUR in der
+		// Editor-Vorschau hier eine kleine Box, damit man die Navi-Liste
+		// positionieren (verschieben) kann.
+		if (preview && cfg.isElementEnabled(KEY_NAV)) {
+			List<HudRow> rows = new ArrayList<>();
+			rows.add(new HudRow("", "King Yolkar", GREEN, List.of(), false));
+			out.add(new HudGroup(KEY_NAV, "Navi", rows, Items.COMPASS));
+		}
 
 		// 6) Kristalle (nur in Crystal Hollows): abgegeben / noch offen.
 		if (cfg.isElementEnabled(KEY_CRYSTALS) && (preview || MiningData.INSTANCE.onCrystalHollows)) {

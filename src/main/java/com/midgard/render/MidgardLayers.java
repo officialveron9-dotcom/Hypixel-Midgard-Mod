@@ -5,6 +5,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderSetup;
 import net.minecraft.client.render.VertexFormats;
@@ -32,21 +33,21 @@ public final class MidgardLayers {
 		if (!tried) {
 			tried = true;
 			try {
-				RenderPipeline pipeline = RenderPipeline.builder()
+				// Aus dem vanilla POSITION_COLOR-Snippet ableiten (bringt Shader +
+				// alle nötigen Uniforms mit) und nur Tiefentest/Blend/Format ändern.
+				RenderPipeline pipeline = RenderPipeline.builder(RenderPipelines.POSITION_COLOR_SNIPPET)
 						.withLocation("midgard:pipeline/path_filled_depth")
-						.withVertexShader("core/position_color")
-						.withFragmentShader("core/position_color")
 						.withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
 						.withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
 						.withDepthWrite(false)
-						.withColorWrite(true)
 						.withCull(false)
 						.withBlend(BlendFunction.TRANSLUCENT)
 						.build();
 				RenderSetup setup = RenderSetup.builder(pipeline).translucent().build();
 				depthQuads = RenderLayer.of("midgard_path_filled_depth", setup);
+				System.out.println("[Midgard] Tiefen-Fuell-Layer aktiv (Pfad wird vom Terrain verdeckt).");
 			} catch (Throwable t) {
-				System.err.println("[Midgard] Tiefen-Fuell-Layer nicht verfuegbar, weiche aus: " + t);
+				System.err.println("[Midgard] Tiefen-Fuell-Layer nicht verfuegbar, weiche aus (durch Waende): " + t);
 				depthQuads = null;
 			}
 		}

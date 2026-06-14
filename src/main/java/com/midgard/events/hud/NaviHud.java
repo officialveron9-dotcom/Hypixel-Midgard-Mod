@@ -39,7 +39,7 @@ public final class NaviHud {
 	private static final int CARD_HOVER = 0x99343444;
 	private static final float FS = 8f;
 
-	private record Entry(String label, String tag, boolean enabled, boolean active, Runnable action) {
+	private record Entry(String label, int color, boolean clickable, Runnable action) {
 	}
 
 	private record Rect(int x1, int y1, int x2, int y2, Runnable action) {
@@ -58,26 +58,31 @@ public final class NaviHud {
 		if (!MiningData.INSTANCE.onMiningIsland) {
 			return e;
 		}
-		e.add(new Entry("Fadenkreuz-Ziel", "setzen", true, false, NaviHud::targetLookedAt));
+		e.add(new Entry("Fadenkreuz-Ziel", TEXT, true, NaviHud::targetLookedAt));
 		if (MiningData.INSTANCE.onCrystalHollows) {
-			for (String loc : CrystalNav.LOCATIONS) {
-				boolean known = CrystalNav.isLearned(loc);
-				boolean active = loc.equals(CrystalNav.targetName());
-				e.add(new Entry(loc, !known ? "erst betreten" : active ? "aktiv" : "los",
-						known, active, () -> CrystalNav.setTarget(loc)));
-			}
+			// Mitte (funktioniert) + Amber-Crystal-Test (King Yolkar, Goblin Guard).
+			e.add(navEntry("Crystal Nucleus"));
+			e.add(new Entry("Amber Crystal", DIM, false, null)); // Überschrift
+			e.add(navEntry("King Yolkar"));
+			e.add(navEntry("Goblin Guard"));
 		} else {
 			boolean auto = !MiningWaypoints.hasManual();
-			e.add(new Entry("Auto (nächste Commission)", auto ? "aktiv" : "auto", true, auto,
-					MiningWaypoints::clearManual));
+			e.add(new Entry("Auto (nächste Commission)", auto ? ACCENT : TEXT, true, MiningWaypoints::clearManual));
 			String cur = MiningWaypoints.hasManual() ? MiningWaypoints.manual().label() : null;
 			for (MiningWaypoints.NavOption o : MiningWaypoints.dwarvenTargets()) {
 				boolean active = o.name().equals(cur);
-				e.add(new Entry(o.name(), active ? "aktiv" : o.learned() ? "los" : "ca.", true, active,
+				e.add(new Entry(o.name(), active ? ACCENT : TEXT, true,
 						() -> MiningWaypoints.setManual(o.x(), o.y(), o.z(), o.name())));
 			}
 		}
 		return e;
+	}
+
+	/** Crystal-Hollows-Eintrag: orange = gewählt, weiß = gefunden, grau = noch suchen. */
+	private Entry navEntry(String name) {
+		boolean active = name.equals(CrystalNav.targetName());
+		int col = active ? ACCENT : CrystalNav.isLearned(name) ? TEXT : DIM;
+		return new Entry(name, col, true, () -> CrystalNav.setTarget(name));
 	}
 
 	public void render(DrawContext c) {
@@ -98,13 +103,12 @@ public final class NaviHud {
 		int rowH = 11;
 		int headH = 13;
 		int pad = 5;
-		int w = 150;
-		// Breite an den längsten Eintrag anpassen.
+		int w = 110;
+		// Breite an den längsten Eintrag anpassen (nur Name, kein Tag).
 		for (Entry en : entries) {
-			int lw = txtW(en.label(), mc) + txtW(en.tag(), mc) + 24;
-			w = Math.max(w, lw);
+			w = Math.max(w, txtW(en.label(), mc) + pad * 2 + 4);
 		}
-		w = Math.min(w, 200);
+		w = Math.min(w, 190);
 		int h = headH + entries.size() * rowH + pad;
 		int x = cfg.hasGroupPos(MiningHud.KEY_NAV) ? cfg.groupX(MiningHud.KEY_NAV) : sw - w - 6;
 		int y = cfg.hasGroupPos(MiningHud.KEY_NAV) ? cfg.groupY(MiningHud.KEY_NAV) : Math.max(40, sh / 2 - h / 2);
@@ -113,7 +117,7 @@ public final class NaviHud {
 
 		UIRenderer.fillRoundedRect(c, x - 1, y - 1, w + 2, h + 2, 6, BORDER);
 		UIRenderer.fillRoundedRect(c, x, y, w, h, 5, PANEL);
-		txt(c, "Navi-Ziel", x + pad, y + 4, HEADER, true, mc);
+		txt(c, "Navi", x + pad, y + 4, HEADER, true, mc);
 
 		double mx = mc.mouse.getX() * (double) sw / mc.getWindow().getWidth();
 		double my = mc.mouse.getY() * (double) sh / mc.getWindow().getHeight();
@@ -121,15 +125,14 @@ public final class NaviHud {
 
 		int ry = y + headH;
 		for (Entry en : entries) {
-			boolean hover = cursor && en.enabled() && mx >= x + 2 && mx <= x + w - 2 && my >= ry && my <= ry + rowH;
+			boolean hover = cursor && en.clickable() && mx >= x + 2 && mx <= x + w - 2 && my >= ry && my <= ry + rowH;
 			if (hover) {
 				UIRenderer.fillRoundedRect(c, x + 2, ry, w - 4, rowH, 3, CARD_HOVER);
 			}
-			int col = !en.enabled() ? DIM : en.active() ? ACCENT : TEXT;
-			txt(c, en.label(), x + pad, ry + 2, col, false, mc);
-			int tagCol = !en.enabled() ? DIM : en.active() ? ACCENT : HEADER;
-			txt(c, en.tag(), x + w - pad - txtW(en.tag(), mc), ry + 2, tagCol, false, mc);
-			if (en.enabled()) {
+			// Überschrift (nicht klickbar) leicht eingerückt, sonst normal.
+			int lx = en.clickable() ? x + pad : x + pad - 2;
+			txt(c, en.label(), lx, ry + 2, en.color(), false, mc);
+			if (en.clickable() && en.action() != null) {
 				rects.add(new Rect(x + 2, ry, x + w - 2, ry + rowH, en.action()));
 			}
 			ry += rowH;

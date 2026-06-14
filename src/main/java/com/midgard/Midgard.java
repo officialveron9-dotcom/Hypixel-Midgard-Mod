@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14z (Pfad gerade per Douglas-Peucker+vor dem Spieler, EIN Stil, Navi komplett im HUD)");
+		System.out.println("[Midgard] init build=2026-06-15a (Tiefe aus Snippet, gerader, CH-Navi=Amber-Test+Pending, Navi nur Name, Editor-Feinschliff)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

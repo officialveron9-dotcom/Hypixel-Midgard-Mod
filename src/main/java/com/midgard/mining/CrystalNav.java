@@ -24,38 +24,22 @@ import net.minecraft.util.Formatting;
  */
 public final class CrystalNav {
 
-	/** Alle anpeilbaren Orte (Reihenfolge = Anzeige in der Liste). */
+	/** Anpeilbare Orte (Test-Set: Mitte + Amber-Crystal-NPCs). Reihenfolge = Anzeige. */
 	public static final List<String> LOCATIONS = List.of(
 			"Crystal Nucleus",
-			"Jungle",
-			"Mithril Deposits",
-			"Goblin Holdout",
-			"Precursor Remnants",
-			"Magma Fields",
-			"Fairy Grotto",
-			"Khazad-dum",
-			"Jungle Temple",
-			"Lava Tubes",
-			"Goblin King",
-			"Corleone");
+			"King Yolkar",
+			"Goblin Guard");
 
 	/**
-	 * Benannte NPCs/Bosse -> Ort (werden als Entity in der Nähe automatisch
-	 * gelernt). Stand laut Wiki – die Crystal-Nucleus-Kristalle hängen daran:
-	 * King Yolkar=Amber, Keepers of Divan=Jade, Odawa/Kalhuiki=Amethyst,
-	 * Professor Robot=Sapphire (Topaz=Boss Bal in Khazad-dûm).
+	 * Benannte NPCs -> Ort (werden als Entity in der Nähe automatisch gelernt).
+	 * Aktuell nur die Amber-Crystal-Ziele zum Testen (King Yolkar = Goblin King,
+	 * Goblin Guard). Sobald die Erkennung sicher läuft, kommen die anderen
+	 * Kristall-NPCs zurück.
 	 */
 	private static final Map<String, String> NPC_TO_LOCATION = Map.ofEntries(
-			Map.entry("king yolkar", "Goblin King"),
-			Map.entry("goblin king", "Goblin King"),
-			Map.entry("corleone", "Corleone"),
-			Map.entry("team treasurite", "Precursor Remnants"),
-			Map.entry("automaton", "Precursor Remnants"),
-			Map.entry("professor robot", "Precursor Remnants"),
-			Map.entry("keeper of", "Mithril Deposits"),
-			Map.entry("odawa", "Jungle Temple"),
-			Map.entry("kalhuiki", "Jungle Temple"),
-			Map.entry("key guardian", "Jungle"));
+			Map.entry("king yolkar", "King Yolkar"),
+			Map.entry("yolkar", "King Yolkar"),
+			Map.entry("goblin guard", "Goblin Guard"));
 
 	private static final int[] NUCLEUS = { 513, 125, 513 };
 
@@ -84,15 +68,7 @@ public final class CrystalNav {
 		if (mc.player == null) {
 			return;
 		}
-		// 1) Gebiet aus dem Scoreboard lernen (eigene Position).
-		String area = detectArea(mc);
-		if (area != null) {
-			learned.put(area, new int[] {
-					(int) Math.round(mc.player.getX()),
-					(int) Math.round(mc.player.getY()),
-					(int) Math.round(mc.player.getZ()) });
-		}
-		// 2) Benannte NPCs/Bosse in der Nähe erkennen und ihren Ort lernen.
+		// Benannte NPCs in der Nähe erkennen und ihre Position lernen.
 		if (mc.world != null) {
 			long now = System.currentTimeMillis();
 			boolean diag = now - lastDiagMs > 20_000;
@@ -126,22 +102,12 @@ public final class CrystalNav {
 				System.out.println("[Midgard] CH-Entities:" + names);
 			}
 		}
-	}
-
-	/** Aktuelles Crystal-Hollows-Gebiet aus dem Scoreboard (oder null). */
-	private static String detectArea(MinecraftClient mc) {
-		for (String line : ScoreboardReader.sidebarLines(mc)) {
-			String l = line == null ? "" : line.toLowerCase(Locale.ROOT);
-			for (String loc : LOCATIONS) {
-				if (loc.equals("Crystal Nucleus")) {
-					continue;
-				}
-				if (l.contains(loc.toLowerCase(Locale.ROOT))) {
-					return loc;
-				}
-			}
+		// Pending-Ziel: sobald der gewählte NPC geladen/gelernt ist, Position
+		// setzen -> Pfadfindung startet automatisch (ohne erneutes Auswählen).
+		if (targetName != null) {
+			int[] p = learned.get(targetName);
+			targetPos = p; // null, solange noch nicht gefunden
 		}
-		return null;
 	}
 
 	/**
@@ -190,12 +156,11 @@ public final class CrystalNav {
 		return learned.containsKey(name);
 	}
 
+	/** Ziel wählen – auch wenn der NPC noch nicht gefunden ist (Pending). Sobald
+	 *  er in der Nähe geladen wird, startet die Navigation automatisch. */
 	public static void setTarget(String name) {
-		int[] p = learned.get(name);
-		if (p != null) {
-			targetName = name;
-			targetPos = p;
-		}
+		targetName = name;
+		targetPos = learned.get(name); // null = wird gesucht
 	}
 
 	public static void cancel() {
@@ -203,7 +168,13 @@ public final class CrystalNav {
 		targetPos = null;
 	}
 
+	/** Ein Ziel ist GEWÄHLT (evtl. noch in Suche). */
 	public static boolean hasTarget() {
+		return targetName != null;
+	}
+
+	/** Ziel ist gewählt UND seine Position bekannt (Navigation läuft). */
+	public static boolean targetKnown() {
 		return targetPos != null;
 	}
 
