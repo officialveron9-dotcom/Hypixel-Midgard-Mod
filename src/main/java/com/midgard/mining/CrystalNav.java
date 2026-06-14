@@ -24,34 +24,67 @@ import net.minecraft.util.Formatting;
  */
 public final class CrystalNav {
 
-	/** Anpeilbare Orte (Test-Set: Mitte + Amber-Crystal-NPCs). Reihenfolge = Anzeige. */
-	public static final List<String> LOCATIONS = List.of(
-			"Crystal Nucleus",
-			"King Yolkar",
-			"Goblin Guard");
+	/**
+	 * Ein Kristall + sein Gebiet + die Standorte (NPCs), wo man ihn bekommt.
+	 * {@code color} ist die Gem-Farbe für das Icon in der Navi.
+	 */
+	public record CrystalArea(String crystal, int color, String areaKeyword, List<String> locations) {
+	}
 
 	/**
-	 * Benannte NPCs -> Ort (werden als Entity in der Nähe automatisch gelernt).
-	 * Aktuell nur die Amber-Crystal-Ziele zum Testen (King Yolkar = Goblin King,
-	 * Goblin Guard). Sobald die Erkennung sicher läuft, kommen die anderen
-	 * Kristall-NPCs zurück.
+	 * Die fünf Crystal-Hollows-Kristalle und ihre Gebiete/NPCs. Reihenfolge =
+	 * Anzeige in der Navi. (Topaz/Magma hat keinen festen NPC -> weggelassen.)
+	 */
+	public static final List<CrystalArea> CRYSTALS = List.of(
+			new CrystalArea("Amber Crystal", 0xFFF2A93B, "goblin",
+					List.of("King Yolkar")),
+			new CrystalArea("Jade Crystal", 0xFF3FD466, "jungle",
+					List.of("Kalhuiki Door Guardian")),
+			new CrystalArea("Amethyst Crystal", 0xFFB05CFF, "precursor",
+					List.of("Professor Robot")),
+			new CrystalArea("Sapphire Crystal", 0xFF4F9BFF, "mithril",
+					List.of("Keeper of Diamond", "Keeper of Emerald",
+							"Keeper of Lapis", "Keeper of Gold")));
+
+	/** Anpeilbare Orte: Mitte + alle NPCs aus {@link #CRYSTALS}. */
+	public static final List<String> LOCATIONS = buildLocations();
+
+	private static List<String> buildLocations() {
+		List<String> l = new ArrayList<>();
+		l.add("Crystal Nucleus");
+		for (CrystalArea c : CRYSTALS) {
+			l.addAll(c.locations());
+		}
+		return List.copyOf(l);
+	}
+
+	/**
+	 * Kurz-Stichwörter -> Ort (zusätzlich zum vollen Namen, der über
+	 * {@link #LOCATIONS} sowieso gematcht wird). Robust gegen Rang-/Farbpräfixe.
 	 */
 	private static final Map<String, String> NPC_TO_LOCATION = Map.ofEntries(
-			Map.entry("king yolkar", "King Yolkar"),
 			Map.entry("yolkar", "King Yolkar"),
-			Map.entry("goblin guard", "Goblin Guard"));
+			Map.entry("kalhuiki", "Kalhuiki Door Guardian"),
+			Map.entry("door guardian", "Kalhuiki Door Guardian"),
+			Map.entry("professor", "Professor Robot"));
 
 	private static final int[] NUCLEUS = { 513, 125, 513 };
 
 	/**
-	 * Ungefähre Gebiets-Mitte je Ziel, SOLANGE der NPC noch nicht geladen ist.
-	 * Die Amber-NPCs (King Yolkar, Goblin Guard) sind im Goblin Holdout = SW-
-	 * Quadrant (X&lt;512, Z&gt;512). So zeigt der Pfad schon die Richtung; sobald
-	 * der NPC in der Nähe lädt, übernimmt die exakte Position.
+	 * Ungefähre Gebiets-Mitte je NPC, SOLANGE er noch nicht geladen ist – nur als
+	 * Richtungshinweis. Crystal Hollows liegt grob als Kreuz um die Mitte (512):
+	 * Mithril = Nord (Z&lt;512), Goblin = Süd (Z&gt;512), Jungle = West (X&lt;512),
+	 * Precursor = Ost (X&gt;512). Sobald der NPC in der Nähe lädt, zählt die exakte
+	 * Position. (Goblin-Süd bestätigt über Amber-Spawn ~511/703.)
 	 */
-	private static final Map<String, int[]> APPROX = Map.of(
-			"King Yolkar", new int[] { 356, 140, 667 },
-			"Goblin Guard", new int[] { 356, 140, 667 });
+	private static final Map<String, int[]> APPROX = Map.ofEntries(
+			Map.entry("King Yolkar", new int[] { 500, 130, 690 }),            // Süd (Goblin)
+			Map.entry("Kalhuiki Door Guardian", new int[] { 330, 130, 512 }), // West (Jungle)
+			Map.entry("Professor Robot", new int[] { 700, 130, 512 }),        // Ost (Precursor)
+			Map.entry("Keeper of Diamond", new int[] { 480, 130, 330 }),      // Nord (Mithril)
+			Map.entry("Keeper of Emerald", new int[] { 520, 130, 330 }),
+			Map.entry("Keeper of Lapis", new int[] { 540, 130, 350 }),
+			Map.entry("Keeper of Gold", new int[] { 500, 130, 350 }));
 
 	private static final Map<String, int[]> learned = new HashMap<>();
 	private static volatile String targetName;
@@ -78,21 +111,15 @@ public final class CrystalNav {
 		if (mc.player == null) {
 			return;
 		}
-		// Im Goblin-Gebiet (Scoreboard) zählen die Goblin-Mobs (heißen z. B.
-		// "Weakling") als "Goblin Guard" – aber NUR dort, damit nicht irgendein
-		// Goblin woanders matcht.
 		String area = ScoreboardReader.currentArea(mc);
-		boolean inGoblinArea = area != null && area.toLowerCase(Locale.ROOT).contains("goblin");
 
-		// Benannte NPCs in der Nähe erkennen und ihre Position lernen.
+		// Benannte NPCs in der Nähe erkennen und ihre Position lernen (per Name,
+		// nicht per ID – die IDs ändern sich pro Session).
 		if (mc.world != null) {
 			long now = System.currentTimeMillis();
 			boolean diag = now - lastDiagMs > 20_000;
 			StringBuilder names = diag ? new StringBuilder() : null;
 			int scanned = 0;
-			double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
-			double goblinBestD = Double.MAX_VALUE;
-			int[] goblinBestPos = null;
 			for (Entity e : mc.world.getEntities()) {
 				if (scanned++ > 300 || e.getName() == null) {
 					continue;
@@ -100,35 +127,21 @@ public final class CrystalNav {
 				String en = ScoreboardReader.stripFormatting(e.getName().getString());
 				String low = en.toLowerCase(Locale.ROOT);
 				int[] pos = { (int) Math.round(e.getX()), (int) Math.round(e.getY()), (int) Math.round(e.getZ()) };
-				// direkt nach Ortsnamen im NPC-Namen
+				// voller Ortsname im NPC-Namen (z. B. "Keeper of Diamond")
 				for (String loc : LOCATIONS) {
 					if (!loc.equals("Crystal Nucleus") && low.contains(loc.toLowerCase(Locale.ROOT))) {
 						learned.put(loc, pos);
 					}
 				}
-				// bekannte NPC-/Boss-Namen -> Ort
+				// Kurz-Stichwörter (yolkar, kalhuiki, professor ...)
 				for (Map.Entry<String, String> e2 : NPC_TO_LOCATION.entrySet()) {
 					if (low.contains(e2.getKey())) {
 						learned.put(e2.getValue(), pos);
 					}
 				}
-				// Goblin-Mobs im Goblin-Gebiet -> nächsten als "Goblin Guard" merken.
-				if (inGoblinArea && (low.contains("goblin") || low.contains("weakling")
-						|| low.contains("knifethrower") || low.contains("battlehardened"))
-						&& !low.contains("yolkar") && !low.contains("king")) {
-					double d = (e.getX() - px) * (e.getX() - px) + (e.getY() - py) * (e.getY() - py)
-							+ (e.getZ() - pz) * (e.getZ() - pz);
-					if (d < goblinBestD) {
-						goblinBestD = d;
-						goblinBestPos = pos;
-					}
-				}
 				if (diag && en.length() > 2 && en.matches(".*[A-Za-z].*") && !en.startsWith("[")) {
 					names.append(" | ").append(en);
 				}
-			}
-			if (goblinBestPos != null) {
-				learned.put("Goblin Guard", goblinBestPos);
 			}
 			if (diag) {
 				lastDiagMs = now;

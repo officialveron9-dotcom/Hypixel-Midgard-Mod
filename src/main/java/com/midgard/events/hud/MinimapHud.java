@@ -31,11 +31,20 @@ public final class MinimapHud {
 	private static final double MIN = 201, RANGE = 622; // CH-Grenzen ~201..823
 	private static final int PANEL = 0xE6121218;
 	private static final int BORDER = 0x55FFFFFF;
-	private static final int GRID = 0x22FFFFFF;
 	private static final int NUCLEUS = 0xFFD06BFF;
-	private static final int AMBER = 0xFFF2A93B;
 	private static final int DIM = 0xFF8C8C97;
 	private static final int SIZE = 96;
+
+	// Gebietsfarben wie auf der echten CH-Karte (Füllung halbtransparent).
+	private static final int F_JUNGLE = 0x663FD466;   // West  – grün
+	private static final int F_MITHRIL = 0x664F9BFF;  // Nord  – blau
+	private static final int F_GOBLIN = 0x66A86B33;   // Süd   – braun
+	private static final int F_PRECURSOR = 0x66999CA6; // Ost  – grau
+	// Punkt-Farben = Gem-Farbe des jeweiligen Kristalls (wie die Navi-Icons).
+	private static final int C_AMBER = 0xFFF2A93B;
+	private static final int C_JADE = 0xFF3FD466;
+	private static final int C_AMETHYST = 0xFFB05CFF;
+	private static final int C_SAPPHIRE = 0xFF4F9BFF;
 
 	private MinimapHud() {
 	}
@@ -122,12 +131,26 @@ public final class MinimapHud {
 	}
 
 	private static int decoColor(String name) {
+		return npcColor(name);
+	}
+
+	/** Punktfarbe = Gem-Farbe des Kristalls, zu dem der NPC/Ort gehört. */
+	private static int npcColor(String name) {
 		String n = name.toLowerCase();
-		if (n.contains("yolkar") || n.contains("goblin")) {
-			return AMBER;
-		}
 		if (n.contains("nucleus")) {
 			return NUCLEUS;
+		}
+		if (n.contains("yolkar") || n.contains("goblin")) {
+			return C_AMBER;
+		}
+		if (n.contains("kalhuiki") || n.contains("guardian") || n.contains("jungle")) {
+			return C_JADE;
+		}
+		if (n.contains("professor") || n.contains("precursor") || n.contains("automaton")) {
+			return C_AMETHYST;
+		}
+		if (n.contains("keeper") || n.contains("mithril")) {
+			return C_SAPPHIRE;
 		}
 		return 0xFFFFE070;
 	}
@@ -136,14 +159,23 @@ public final class MinimapHud {
 
 	private void renderFallback(DrawContext c, int x, int y, MinecraftClient mc) {
 		int half = SIZE / 2;
-		// Feste Gemstone-Quadranten (Lage liegt geometrisch fest, X/Z um 512):
-		// Jungle NW, Mithril NE, Goblin SW, Precursor SE – sofort sichtbar.
-		c.fill(x, y, x + half, y + half, 0x44B050FF); // NW Jungle (Amethyst lila)
-		c.fill(x + half, y, x + SIZE, y + half, 0x4435C46A); // NE Mithril (Jade grün)
-		c.fill(x, y + half, x + half, y + SIZE, 0x44F2A93B); // SW Goblin (Amber orange)
-		c.fill(x + half, y + half, x + SIZE, y + SIZE, 0x444F9BFF); // SE Precursor (Sapphire blau)
-		c.fill(x + half, y, x + half + 1, y + SIZE, GRID);
-		c.fill(x, y + half, x + SIZE, y + half + 1, GRID);
+		// CH-Gebiete liegen als Kreuz um die Mitte (512). Diagonal-Split (X-Form):
+		// Nord = Mithril (blau), Süd = Goblin (braun), West = Jungle (grün),
+		// Ost = Precursor (grau) – wie auf der echten Karte. Sofort sichtbar.
+		for (int j = 0; j < SIZE; j += 2) {
+			int dz = j + 1 - half;
+			for (int i = 0; i < SIZE; i += 2) {
+				int dx = i + 1 - half;
+				int col;
+				if (Math.abs(dx) >= Math.abs(dz)) {
+					col = dx < 0 ? F_JUNGLE : F_PRECURSOR; // West / Ost
+				} else {
+					col = dz < 0 ? F_MITHRIL : F_GOBLIN;   // Nord / Süd
+				}
+				c.fill(x + i, y + j, x + i + 2, y + j + 2, col);
+			}
+		}
+		// Diagonalen dezent andeuten + Norden markieren.
 		txt(c, "N", x + half - 2, y + 1, DIM, mc);
 		for (Map.Entry<String, int[]> e : CrystalNav.learnedView().entrySet()) {
 			int[] p = e.getValue();
@@ -165,13 +197,7 @@ public final class MinimapHud {
 	}
 
 	private static int colorFor(String name) {
-		if (name.equals("Crystal Nucleus")) {
-			return NUCLEUS;
-		}
-		if (name.equals("King Yolkar") || name.equals("Goblin Guard")) {
-			return AMBER;
-		}
-		return 0xFF5BE36B;
+		return npcColor(name);
 	}
 
 	// ---- gemeinsame Helfer ------------------------------------------------

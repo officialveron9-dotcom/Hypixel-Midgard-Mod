@@ -39,7 +39,11 @@ public final class NaviHud {
 	private static final int CARD_HOVER = 0x99343444;
 	private static final float FS = 8f;
 
-	private record Entry(String label, int color, boolean clickable, Runnable action) {
+	/** gem = Farbe des Gem-Icons rechts (-1 = keins); indent = Extra-Einzug links. */
+	private record Entry(String label, int color, boolean clickable, Runnable action, int gem, int indent) {
+		Entry(String label, int color, boolean clickable, Runnable action) {
+			this(label, color, clickable, action, -1, 0);
+		}
 	}
 
 	private record Rect(int x1, int y1, int x2, int y2, Runnable action) {
@@ -60,11 +64,14 @@ public final class NaviHud {
 		}
 		e.add(new Entry("Fadenkreuz-Ziel", TEXT, true, NaviHud::targetLookedAt));
 		if (MiningData.INSTANCE.onCrystalHollows) {
-			// Mitte (funktioniert) + Amber-Crystal-Test (King Yolkar, Goblin Guard).
-			e.add(navEntry("Crystal Nucleus"));
-			e.add(new Entry("Amber Crystal", DIM, false, null)); // Überschrift
-			e.add(navEntry("King Yolkar"));
-			e.add(navEntry("Goblin Guard"));
+			e.add(navEntry("Crystal Nucleus", 0));
+			// Pro Kristall eine Überschrift (mit Gem-Icon), darunter die Standorte.
+			for (CrystalNav.CrystalArea ca : CrystalNav.CRYSTALS) {
+				e.add(new Entry(ca.crystal(), ca.color(), false, null, ca.color(), 0));
+				for (String npc : ca.locations()) {
+					e.add(navEntry(npc, 8));
+				}
+			}
 		} else {
 			boolean auto = !MiningWaypoints.hasManual();
 			e.add(new Entry("Auto (nächste Commission)", auto ? ACCENT : TEXT, true, MiningWaypoints::clearManual));
@@ -79,10 +86,10 @@ public final class NaviHud {
 	}
 
 	/** Crystal-Hollows-Eintrag: orange = gewählt, weiß = gefunden, grau = noch suchen. */
-	private Entry navEntry(String name) {
+	private Entry navEntry(String name, int indent) {
 		boolean active = name.equals(CrystalNav.targetName());
 		int col = active ? ACCENT : CrystalNav.isLearned(name) ? TEXT : DIM;
-		return new Entry(name, col, true, () -> CrystalNav.setTarget(name));
+		return new Entry(name, col, true, () -> CrystalNav.setTarget(name), -1, indent);
 	}
 
 	public void render(DrawContext c) {
@@ -104,11 +111,12 @@ public final class NaviHud {
 		int headH = 13;
 		int pad = 5;
 		int w = 120;
-		// Breite an den längsten Eintrag anpassen (nur Name, kein Tag).
+		// Breite an den längsten Eintrag anpassen (Einzug + ggf. Gem-Icon).
 		for (Entry en : entries) {
-			w = Math.max(w, txtW(en.label(), mc) + pad * 2 + 4);
+			int extra = en.indent() + (en.gem() != -1 ? 14 : 0);
+			w = Math.max(w, txtW(en.label(), mc) + extra + pad * 2 + 4);
 		}
-		w = Math.min(w, 190);
+		w = Math.min(w, 200);
 		int h = headH + entries.size() * rowH + pad;
 		int x = cfg.hasGroupPos(MiningHud.KEY_NAV) ? cfg.groupX(MiningHud.KEY_NAV) : sw - w - 6;
 		int y = cfg.hasGroupPos(MiningHud.KEY_NAV) ? cfg.groupY(MiningHud.KEY_NAV) : Math.max(40, sh / 2 - h / 2);
@@ -129,13 +137,31 @@ public final class NaviHud {
 			if (hover) {
 				UIRenderer.fillRoundedRect(c, x + 2, ry, w - 4, rowH, 3, CARD_HOVER);
 			}
-			// Überschrift (nicht klickbar) leicht eingerückt, sonst normal.
-			int lx = en.clickable() ? x + pad : x + pad - 2;
-			txt(c, en.label(), lx, ry + 2, en.color(), false, mc);
+			boolean header = en.gem() != -1; // Kristall-Überschrift -> fett + Gem
+			int lx = (en.clickable() ? x + pad : x + pad - 2) + en.indent();
+			txt(c, en.label(), lx, ry + 2, en.color(), header, mc);
+			if (header) {
+				gem(c, x + w - pad - 7, ry + 2, en.gem());
+			}
 			if (en.clickable() && en.action() != null) {
 				rects.add(new Rect(x + 2, ry, x + w - 2, ry + rowH, en.action()));
 			}
 			ry += rowH;
+		}
+	}
+
+	/** Kleines Gem-Icon (Raute) als „Logo" des Kristalls, rechts in der Zeile. */
+	private void gem(DrawContext c, int x, int yTop, int color) {
+		int dark = 0xFF000000 | ((color >> 1) & 0x7F7F7F); // dunklerer Rand
+		// Raute aus 7x7: Breite wächst zur Mitte, dann wieder schmaler.
+		int[] w = { 1, 3, 5, 7, 5, 3, 1 };
+		for (int row = 0; row < 7; row++) {
+			int ww = w[row];
+			int sx = x + (7 - ww) / 2;
+			c.fill(sx, yTop + row, sx + ww, yTop + row + 1, dark);
+			if (ww > 2) {
+				c.fill(sx + 1, yTop + row, sx + ww - 1, yTop + row + 1, color);
+			}
 		}
 	}
 
