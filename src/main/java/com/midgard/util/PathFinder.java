@@ -84,27 +84,17 @@ public final class PathFinder {
 	private record Node(BlockPos pos, double g, double f) {
 	}
 
-	/** Luft-Schritte kosten mehr -> der Pfad bevorzugt den Boden, fliegt nur wenn nötig. */
-	private static final double AIR_PENALTY = 2.6;
-
 	private static List<Vec3d> astar(ClientWorld world, BlockPos start, BlockPos goal) {
 		if (start.getManhattanDistance(goal) > 600) {
 			return straightFallback(start, goal);
 		}
-		// Start: Boden unter dem Spieler (auch wenn er springt/fliegt), sonst eine
-		// freie Zelle (Luft).
+		// Start: fester Boden unter dem Spieler (auch wenn er springt).
 		BlockPos s = standableStart(world, start);
 		if (s == null) {
-			s = nearestPassable(world, start);
+			return List.of(); // kein begehbarer Start -> keine Linie
 		}
-		if (s == null) {
-			return straightFallback(start, goal);
-		}
-		// Ziel: begehbarer Block, sonst freie Zelle, sonst Roh-Ziel (Teilweg).
+		// Ziel: nächster begehbarer Block, sonst Roh-Ziel (Teilweg dahin).
 		BlockPos gs = nearestStandable(world, goal);
-		if (gs == null) {
-			gs = nearestPassable(world, goal);
-		}
 		BlockPos target = gs != null ? gs : goal;
 
 		PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Double.compare(a.f, b.f));
@@ -133,42 +123,42 @@ public final class PathFinder {
 			}
 			for (int dx = -1; dx <= 1; dx++) {
 				for (int dz = -1; dz <= 1; dz++) {
-					for (int dy = -1; dy <= 1; dy++) {
-						if (dx == 0 && dy == 0 && dz == 0) {
-							continue;
-						}
+					if (dx == 0 && dz == 0) {
+						continue;
+					}
+					// Keine Diagonale durch Block-Ecken (sonst klemmt der Spieler).
+					if (dx != 0 && dz != 0
+							&& (!passable(world, cp.add(dx, 0, 0)) || !passable(world, cp.add(0, 0, dz)))) {
+						continue;
+					}
+					double horiz = Math.sqrt(dx * dx + dz * dz);
+					// a) Gehen / 1 hoch (springen) / 1 runter: höchsten begehbaren Block.
+					BlockPos step = null;
+					int stepDy = 0;
+					for (int dy = 1; dy >= -1; dy--) {
 						BlockPos np = cp.add(dx, dy, dz);
-						boolean ground = canStand(world, np); // fester Boden drunter
-						boolean air = !ground && canFly(world, np); // nur frei (Luft)
-						if (!ground && !air) {
-							continue;
+						if (canStand(world, np)) {
+							step = np;
+							stepDy = dy;
+							break;
 						}
-						// Reine Vertikal-Schritte (Wand hoch/runter, Loch) nur über Luft.
-						if (dx == 0 && dz == 0 && !air) {
-							continue;
+					}
+					if (step != null) {
+						// Hochspringen nur, wenn über dem Start Kopffreiheit ist.
+						if (stepDy <= 0 || passable(world, cp.up(2))) {
+							relax(open, best, came, cp, cur.g, step, horiz + (stepDy != 0 ? 0.4 : 0), target);
 						}
-						// Keine Diagonale durch Block-Ecken (waagerecht).
-						if (dx != 0 && dz != 0) {
-							if (!passable(world, cp.add(dx, 0, 0)) || !passable(world, cp.add(0, 0, dz))) {
-								continue;
+						continue;
+					}
+					// b) Fallen: Kante frei -> nach unten zum nächsten Landeplatz (bis 6 tief).
+					BlockPos edge = cp.add(dx, 0, dz);
+					if (passable(world, edge) && passable(world, edge.up())) {
+						for (int d = 2; d <= 6; d++) {
+							BlockPos land = cp.add(dx, -d, dz);
+							if (canStand(world, land)) {
+								relax(open, best, came, cp, cur.g, land, horiz + d * 0.25, target);
+								break;
 							}
-						}
-						// Luft + senkrechte Diagonale: nicht durch die Decke/Boden-Ecke.
-						if (air && dy != 0 && (dx != 0 || dz != 0)) {
-							if (!passable(world, cp.add(0, dy, 0)) || !passable(world, cp.add(0, dy, 0).up())) {
-								continue;
-							}
-						}
-						// Boden günstig, Luft teurer -> Boden wird bevorzugt.
-						double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-						double step = ground ? dist : dist * AIR_PENALTY;
-						double ng = cur.g + step;
-						long key = np.asLong();
-						Double old = best.get(key);
-						if (old == null || ng < old - 1e-3) {
-							best.put(key, ng);
-							came.put(key, cp);
-							open.add(new Node(np, ng, ng + heur(np, target)));
 						}
 					}
 				}
@@ -183,6 +173,19 @@ public final class PathFinder {
 	private static double heur(BlockPos a, BlockPos b) {
 		double dx = a.getX() - b.getX(), dy = a.getY() - b.getY(), dz = a.getZ() - b.getZ();
 		return Math.sqrt(dx * dx + dy * dy + dz * dz);
+	}
+
+	/** Nachbar {@code np} in die Open-Liste aufnehmen, wenn der neue Weg kürzer ist. */
+	private static void relax(PriorityQueue<Node> open, Map<Long, Double> best, Map<Long, BlockPos> came,
+			BlockPos from, double fromG, BlockPos np, double cost, BlockPos target) {
+		double ng = fromG + cost;
+		long key = np.asLong();
+		Double old = best.get(key);
+		if (old == null || ng < old - 1e-3) {
+			best.put(key, ng);
+			came.put(key, from);
+			open.add(new Node(np, ng, ng + heur(np, target)));
+		}
 	}
 
 	private static List<Vec3d> build(ClientWorld world, Map<Long, BlockPos> came, BlockPos end, BlockPos start) {
@@ -303,29 +306,9 @@ public final class PathFinder {
 		return !world.getBlockState(below).getCollisionShape(world, below).isEmpty();
 	}
 
-	/** Flug: Füße + Kopf frei (kein Boden nötig) – darf nicht in Wänden enden. */
+	/** Füße + Kopf frei (keine Kollision) – für die Sichtlinien-Prüfung. */
 	private static boolean canFly(ClientWorld world, BlockPos pos) {
 		return passable(world, pos) && passable(world, pos.up());
-	}
-
-	/** Nächste freie (durchflugbare) Zelle um pos herum (±3). */
-	private static BlockPos nearestPassable(ClientWorld world, BlockPos pos) {
-		if (canFly(world, pos)) {
-			return pos;
-		}
-		for (int r = 1; r <= 3; r++) {
-			for (int dy = -r; dy <= r; dy++) {
-				for (int dx = -r; dx <= r; dx++) {
-					for (int dz = -r; dz <= r; dz++) {
-						BlockPos n = pos.add(dx, dy, dz);
-						if (canFly(world, n)) {
-							return n;
-						}
-					}
-				}
-			}
-		}
-		return null;
 	}
 
 	/** Sucht vom Startpunkt aus den nächstgelegenen begehbaren Block (±2 vertikal). */

@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15i (Naeherungsziel auf Spieler-Hoehe -> Pfad fliegt nicht mehr hoch durch Bloecke)");
+		System.out.println("[Midgard] init build=2026-06-15j (Wegfinder=echtes Laufen: gehen/springen/fallen, kein Fliegen, nie durch Bloecke)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
