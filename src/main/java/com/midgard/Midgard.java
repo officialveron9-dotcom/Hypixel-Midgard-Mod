@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15aa (Auktions-Suche: Endlosschleife gefixt - Schild sendet beim Ersetzen nicht mehr, Suche per Packet)");
+		System.out.println("[Midgard] init build=2026-06-15ab (Auktions-Suche: Minecraft-Stil, Sterne rechts + echtes Stern-Symbol, Hover-Stats, Vanilla-Schrift)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

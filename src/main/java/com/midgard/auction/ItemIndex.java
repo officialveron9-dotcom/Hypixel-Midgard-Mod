@@ -8,15 +8,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.item.ItemStack;
 
 /**
  * Lädt einmalig die SkyBlock-Item-Liste (Name + ID + Material) von der
@@ -38,8 +43,20 @@ public final class ItemIndex {
 	private volatile List<ItemEntry> items = List.of();
 	private volatile boolean loading = false;
 	private volatile boolean triedThisSession = false;
+	private final Map<String, ItemStack> iconCache = new ConcurrentHashMap<>();
 
 	private ItemIndex() {
+	}
+
+	/** Gebautes Anzeige-Item (einmal pro Item-ID gebaut, dann gecacht). */
+	public ItemStack iconFor(ItemEntry e) {
+		String key = e.id() != null ? e.id() : e.name();
+		ItemStack cached = iconCache.get(key);
+		if (cached == null) {
+			cached = e.buildIcon();
+			iconCache.put(key, cached);
+		}
+		return cached;
 	}
 
 	public boolean isLoaded() {
@@ -130,13 +147,57 @@ public final class ItemIndex {
 			if (name.isEmpty()) {
 				continue;
 			}
-			out.add(new ItemEntry(str(o, "id"), name, str(o, "material"), str(o, "tier")));
+			out.add(new ItemEntry(str(o, "id"), name, str(o, "material"), str(o, "tier"),
+					str(o, "category"), skinValue(o), statsMap(o), dbl(o, "npc_sell_price")));
 		}
 		return out;
 	}
 
 	private static String str(JsonObject o, String k) {
 		return o.has(k) && !o.get(k).isJsonNull() ? o.get(k).getAsString() : "";
+	}
+
+	private static double dbl(JsonObject o, String k) {
+		try {
+			return o.has(k) && !o.get(k).isJsonNull() ? o.get(k).getAsDouble() : 0;
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+
+	/** Kopf-Textur (base64) – kann String oder Objekt mit "value" sein. */
+	private static String skinValue(JsonObject o) {
+		try {
+			if (!o.has("skin") || o.get("skin").isJsonNull()) {
+				return "";
+			}
+			JsonElement s = o.get("skin");
+			if (s.isJsonObject() && s.getAsJsonObject().has("value")) {
+				return s.getAsJsonObject().get("value").getAsString();
+			}
+			if (s.isJsonPrimitive()) {
+				return s.getAsString();
+			}
+		} catch (Exception ignored) {
+		}
+		return "";
+	}
+
+	/** Stats-Map (z. B. DAMAGE -> 100) oder leer. */
+	private static Map<String, Double> statsMap(JsonObject o) {
+		if (!o.has("stats") || !o.get("stats").isJsonObject()) {
+			return Map.of();
+		}
+		Map<String, Double> m = new LinkedHashMap<>();
+		for (Map.Entry<String, JsonElement> e : o.getAsJsonObject("stats").entrySet()) {
+			try {
+				if (e.getValue().isJsonPrimitive()) {
+					m.put(e.getKey(), e.getValue().getAsDouble());
+				}
+			} catch (Exception ignored) {
+			}
+		}
+		return m;
 	}
 
 	/**

@@ -2,10 +2,10 @@ package com.midgard.auction;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import com.midgard.Midgard;
-import com.midgard.render.MidgardText;
-import com.midgard.render.UIRenderer;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -17,25 +17,25 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 
 /**
- * Eigenes Auktions-Such-Menü, das das Hypixel-Such-SCHILD komplett ersetzt.
- * Live-Vorschläge während des Tippens (aus {@link ItemIndex}), Verlauf der
- * letzten Suchen und eine Sterne-Auswahl (lokal). Bestätigen schreibt den Text
- * ins ursprüngliche Schild und schließt es – dadurch führt Hypixel die Suche
- * normal aus (kein eigener Server-Verkehr, anti-cheat-unauffällig).
+ * Eigenes Auktions-Such-Menü im MINECRAFT-Stil (wie Inventar/Auktionshaus):
+ * grauer Bevel-Rahmen, vertiefte Slots, Vanilla-Schrift. Ersetzt das
+ * Hypixel-Such-Schild. Live-Vorschläge, Verlauf, Sterne-Auswahl (lokal) und
+ * Item-Stats beim Drüberfahren. Bestätigen schickt die Suche direkt als Packet.
  */
 public final class AuctionSearchScreen extends Screen {
 
-	private static final int PANEL = 0xFF15151B;
-	private static final int CARD = 0xFF1E1E26;
-	private static final int CARD_HOVER = 0xFF2C2C3A;
-	private static final int ACCENT = 0xFFF2772F;
-	private static final int TEXT = 0xFFF1F1F4;
-	private static final int TEXT_DIM = 0xFF8C8C97;
-	private static final int DIM = 0xCC000000;
-	private static final int BORDER = 0x33FFFFFF;
+	// Vanilla-GUI-Farben (Inventar/Container).
+	private static final int BG = 0xFFC6C6C6;
+	private static final int HI = 0xFFFFFFFF;
+	private static final int SH = 0xFF555555;
+	private static final int BLACK = 0xFF000000;
+	private static final int SLOT = 0xFF8B8B8B;
+	private static final int SLOT_DARK = 0xFF373737;
+	private static final int LABEL = 0xFF404040;
+	private static final int TEXT_IN = 0xFF2A2A2A;
 	private static final int STAR_GOLD = 0xFFFFAA00;
 	private static final int STAR_RED = 0xFFFF5555;
-	private static final float FONT = 9f;
+	private static final int STAR_OFF = 0xFF808080;
 
 	private record Clickable(int x1, int y1, int x2, int y2, Runnable action) {
 		boolean has(double mx, double my) {
@@ -52,6 +52,8 @@ public final class AuctionSearchScreen extends Screen {
 
 	private int px, py, pw, ph;
 	private int listTop, listBottom, listX, listW;
+	private ItemEntry hovered; // für den Tooltip am Frame-Ende
+	private int hovMx, hovMy;
 
 	public AuctionSearchScreen(AbstractSignEditScreen origin) {
 		super(Text.literal("Auktions-Suche"));
@@ -60,7 +62,6 @@ public final class AuctionSearchScreen extends Screen {
 
 	@Override
 	protected void init() {
-		System.out.println("[Midgard] AuctionSearchScreen.init() – Menue ist offen.");
 		ItemIndex.INSTANCE.ensureLoaded();
 		if (Midgard.config != null) {
 			stars = Math.max(0, Math.min(10, Midgard.config.auctionStars));
@@ -70,7 +71,6 @@ public final class AuctionSearchScreen extends Screen {
 
 	@Override
 	public void removed() {
-		System.out.println("[Midgard] AuctionSearchScreen.removed() – Menue wird geschlossen.");
 		super.removed();
 	}
 
@@ -88,101 +88,113 @@ public final class AuctionSearchScreen extends Screen {
 
 	@Override
 	public void renderBackground(DrawContext c, int mouseX, int mouseY, float delta) {
-		c.fill(0, 0, this.width, this.height, DIM);
+		c.fill(0, 0, this.width, this.height, 0xC0000000);
 	}
 
 	@Override
 	public void render(DrawContext c, int mouseX, int mouseY, float delta) {
 		super.render(c, mouseX, mouseY, delta);
 		clickables.clear();
+		hovered = null;
 
-		pw = Math.min(this.width - 60, 560);
-		ph = Math.min(this.height - 60, 360);
+		pw = Math.min(this.width - 40, 520);
+		ph = Math.min(this.height - 40, 340);
 		px = (this.width - pw) / 2;
 		py = (this.height - ph) / 2;
-		int pad = 10;
+		int pad = 8;
 
-		UIRenderer.fillRoundedRect(c, px - 1, py - 1, pw + 2, ph + 2, 8, BORDER);
-		UIRenderer.fillRoundedRect(c, px, py, pw, ph, 7, PANEL);
+		panel(c, px, py, pw, ph);
+		c.drawText(this.textRenderer, "Auktions-Suche", px + pad, py + 6, LABEL, false);
 
-		txt(c, "Auktions-Suche", px + pad, py + pad, TEXT, true);
-
-		// --- Suchfeld -------------------------------------------------------
-		int fieldY = py + pad + 16;
-		int fieldH = 20;
+		// --- Suchfeld (links) + Sterne (rechts daneben) ---------------------
+		int rowY = py + 18;
+		int rowH = 18;
+		int starsW = 10 * 9 + 28; // Platz für 10 Sterne + Zähler
 		int fieldX = px + pad;
-		int fieldW = pw - pad * 2;
-		UIRenderer.fillRoundedRect(c, fieldX, fieldY, fieldW, fieldH, 5, CARD);
+		int fieldW = pw - pad * 2 - starsW - 8;
+		recessed(c, fieldX, rowY, fieldW, rowH);
 		String shown = query.isEmpty() ? "Item-Namen tippen…" : query;
-		int qcol = query.isEmpty() ? TEXT_DIM : TEXT;
-		txt(c, shown + (System.currentTimeMillis() % 1000 < 500 ? "_" : ""), fieldX + 8, fieldY + 6, qcol, false);
-		// Clear-X
+		int qcol = query.isEmpty() ? SH : TEXT_IN;
+		String caret = System.currentTimeMillis() % 1000 < 500 ? "_" : "";
+		c.drawText(this.textRenderer, shown + caret, fieldX + 4, rowY + 5, qcol, false);
 		if (!query.isEmpty()) {
-			int xx = fieldX + fieldW - 16;
-			txt(c, "✕", xx, fieldY + 6, TEXT_DIM, true);
-			clickables.add(new Clickable(xx - 4, fieldY, fieldX + fieldW, fieldY + fieldH, () -> {
+			int xx = fieldX + fieldW - 10;
+			c.drawText(this.textRenderer, "x", xx, rowY + 5, SH, false);
+			clickables.add(new Clickable(xx - 3, rowY, fieldX + fieldW, rowY + rowH, () -> {
 				query = "";
 				recompute();
 			}));
 		}
 
-		// --- Sterne-Reihe ---------------------------------------------------
-		int starY = fieldY + fieldH + 8;
-		txt(c, "Sterne:", fieldX, starY + 1, TEXT_DIM, false);
-		int sx = fieldX + txtW("Sterne:", false) + 8;
+		// Sterne rechts neben dem Suchfeld
+		int starX = fieldX + fieldW + 8;
+		c.drawText(this.textRenderer, "Sterne", starX, rowY - 8, LABEL, false);
 		for (int i = 0; i < 10; i++) {
-			int cx = sx + i * 14;
+			int sx = starX + i * 9;
 			boolean on = i < stars;
-			int col = on ? (i < 5 ? STAR_GOLD : STAR_RED) : 0xFF3A3A44;
-			star(c, cx, starY, col);
+			int col = on ? (i < 5 ? STAR_GOLD : STAR_RED) : STAR_OFF;
+			c.drawText(this.textRenderer, "✪", sx, rowY + 5, col, false);
 			final int lvl = i + 1;
-			clickables.add(new Clickable(cx, starY, cx + 12, starY + 11,
-					() -> setStars(stars == lvl ? lvl - 1 : lvl)));
+			clickables.add(new Clickable(sx, rowY, sx + 9, rowY + rowH, () -> setStars(stars == lvl ? lvl - 1 : lvl)));
 		}
-		txt(c, stars == 0 ? "(beliebig)" : (stars + "★"), sx + 10 * 14 + 6, starY + 1, TEXT_DIM, false);
+		c.drawText(this.textRenderer, stars == 0 ? "0" : String.valueOf(stars),
+				starX + 10 * 9 + 4, rowY + 5, LABEL, false);
 
-		// --- Körper: links Vorschläge, rechts Verlauf -----------------------
-		int bodyTop = starY + 16;
-		int bodyBot = py + ph - 22;
+		// --- Körper: Vorschläge links, Verlauf rechts -----------------------
+		int bodyTop = rowY + rowH + 6;
+		int bodyBot = py + ph - 16;
 		listX = fieldX;
-		listW = (int) (fieldW * 0.62);
+		listW = (int) (pw - pad * 2) * 62 / 100;
 		listTop = bodyTop;
 		listBottom = bodyBot;
+		recessed(c, listX, listTop, listW, bodyBot - bodyTop);
 		renderSuggestions(c, mouseX, mouseY);
 
 		int histX = listX + listW + 8;
-		int histW = fieldX + fieldW - histX;
+		int histW = px + pw - pad - histX;
+		recessed(c, histX, bodyTop, histW, bodyBot - bodyTop);
 		renderHistory(c, mouseX, mouseY, histX, bodyTop, histW, bodyBot);
 
 		// --- Statuszeile ----------------------------------------------------
 		String status = suggestions.size() + " Treffer · Enter = Suchen · Esc = Schließen";
-		txt(c, status, fieldX, py + ph - 14, TEXT_DIM, false);
+		c.drawText(this.textRenderer, status, fieldX, py + ph - 11, LABEL, false);
 		if (stars > 0) {
-			String hint = "Sterne-Filter wirkt nur lokal";
-			txt(c, hint, fieldX + fieldW - txtW(hint, false), py + ph - 14, TEXT_DIM, false);
+			String hint = "Sterne nur lokal";
+			c.drawText(this.textRenderer, hint, px + pw - pad - this.textRenderer.getWidth(hint),
+					py + ph - 11, LABEL, false);
+		}
+
+		// Tooltip ganz zum Schluss (über allem).
+		if (hovered != null) {
+			c.drawTooltip(this.textRenderer, tooltip(hovered), hovMx, hovMy);
 		}
 	}
 
 	private void renderSuggestions(DrawContext c, int mouseX, int mouseY) {
-		int rowH = 16;
+		int rowH = 18;
 		int total = suggestions.size() * rowH;
-		int visible = listBottom - listTop;
+		int visible = listBottom - listTop - 4;
 		double maxScroll = Math.max(0, total - visible);
 		suggScroll = Math.max(0, Math.min(suggScroll, maxScroll));
 
-		c.enableScissor(listX, listTop, listX + listW, listBottom);
-		int y = listTop - (int) suggScroll;
+		c.enableScissor(listX + 1, listTop + 1, listX + listW - 1, listBottom - 1);
+		int y = listTop + 2 - (int) suggScroll;
 		for (ItemEntry e : suggestions) {
 			if (y + rowH > listTop && y < listBottom) {
-				boolean hover = mouseX >= listX && mouseX <= listX + listW && mouseY >= y && mouseY <= y + rowH
+				boolean hover = mouseX >= listX && mouseX <= listX + listW - 4 && mouseY >= y && mouseY <= y + rowH
 						&& mouseY >= listTop && mouseY <= listBottom;
 				if (hover) {
-					UIRenderer.fillRoundedRect(c, listX, y, listW, rowH, 3, CARD_HOVER);
+					c.fill(listX + 1, Math.max(listTop + 1, y), listX + listW - 1, Math.min(listBottom - 1, y + rowH),
+							0x40000000);
+					hovered = e;
+					hovMx = mouseX;
+					hovMy = mouseY;
 				}
-				c.drawItem(new ItemStack(e.icon()), listX + 2, y);
-				txt(c, trim(e.name(), listW - 24), listX + 21, y + 4, TEXT, false);
+				ItemStack icon = e.icon();
+				c.drawItem(icon, listX + 3, y + 1);
+				c.drawText(this.textRenderer, ellipsis(e.name(), listW - 26), listX + 23, y + 5, LABEL, false);
 				final String name = e.name();
-				clickables.add(new Clickable(listX, Math.max(listTop, y), listX + listW,
+				clickables.add(new Clickable(listX, Math.max(listTop, y), listX + listW - 4,
 						Math.min(listBottom, y + rowH), () -> submit(name)));
 			}
 			y += rowH;
@@ -191,53 +203,137 @@ public final class AuctionSearchScreen extends Screen {
 		if (suggestions.isEmpty()) {
 			String msg = query.isEmpty() ? "Tippe einen Item-Namen…"
 					: (ItemIndex.INSTANCE.isLoaded() ? "Keine Treffer" : "Items werden geladen…");
-			txt(c, msg, listX + 2, listTop + 4, TEXT_DIM, false);
+			c.drawText(this.textRenderer, msg, listX + 4, listTop + 5, SH, false);
 		}
-		// Scrollbalken
 		if (maxScroll > 0) {
-			int barH = Math.max(16, (int) ((float) visible / total * visible));
-			int barY = listTop + (int) ((suggScroll / maxScroll) * (visible - barH));
-			UIRenderer.fillRoundedRect(c, listX + listW - 3, barY, 3, barH, 1, ACCENT);
+			int barH = Math.max(14, (int) ((float) visible / total * visible));
+			int barY = listTop + 2 + (int) ((suggScroll / maxScroll) * (visible - barH));
+			c.fill(listX + listW - 3, barY, listX + listW - 1, barY + barH, 0xFF555555);
 		}
 	}
 
 	private void renderHistory(DrawContext c, int mouseX, int mouseY, int x, int top, int w, int bot) {
-		txt(c, "Letzte Suchen", x, top, TEXT_DIM, true);
+		c.drawText(this.textRenderer, "Letzte Suchen", x + 3, top + 3, LABEL, false);
 		List<String> hist = Midgard.config != null ? Midgard.config.auctionHistory : List.of();
-		int rowH = 14;
-		int y = top + 14;
+		int rowH = 13;
+		int y = top + 16;
 		for (int i = 0; i < hist.size() && y + rowH <= bot; i++) {
 			String h = hist.get(i);
 			boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + rowH;
 			if (hover) {
-				UIRenderer.fillRoundedRect(c, x, y, w, rowH, 3, CARD_HOVER);
+				c.fill(x + 1, y, x + w - 1, y + rowH, 0x40000000);
 			}
-			txt(c, trim(h, w - 16), x + 4, y + 3, TEXT, false);
-			// Löschen-X
-			int dxx = x + w - 12;
-			txt(c, "✕", dxx, y + 3, TEXT_DIM, false);
+			c.drawText(this.textRenderer, ellipsis(h, w - 16), x + 4, y + 3, LABEL, false);
+			int dxx = x + w - 11;
+			c.drawText(this.textRenderer, "x", dxx, y + 3, SH, false);
 			final String hv = h;
 			clickables.add(new Clickable(dxx - 2, y, x + w, y + rowH, () -> removeHistory(hv)));
 			clickables.add(new Clickable(x, y, dxx - 2, y + rowH, () -> submit(hv)));
 			y += rowH;
 		}
 		if (hist.isEmpty()) {
-			txt(c, "(noch leer)", x, top + 16, TEXT_DIM, false);
+			c.drawText(this.textRenderer, "(leer)", x + 4, top + 16, SH, false);
 		} else if (y + rowH <= bot) {
-			boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y + 2 && mouseY <= y + rowH + 2;
-			txt(c, "Alles löschen", x + 4, y + 4, hover ? ACCENT : TEXT_DIM, false);
-			clickables.add(new Clickable(x, y + 2, x + w, y + rowH + 2, this::clearHistory));
+			boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + rowH;
+			c.drawText(this.textRenderer, "Alles löschen", x + 4, y + 3, hover ? 0xFFAA0000 : SH, false);
+			clickables.add(new Clickable(x, y, x + w, y + rowH, this::clearHistory));
 		}
 	}
 
-	/** Kleines Stern-Symbol (Raute) – die Roboto-Schrift hat ✪ evtl. nicht. */
-	private void star(DrawContext c, int x, int y, int color) {
-		int[] w = { 1, 3, 5, 3, 1 };
-		for (int row = 0; row < 5; row++) {
-			int ww = w[row];
-			int sx = x + 1 + (5 - ww) / 2;
-			c.fill(sx, y + 1 + row, sx + ww, y + 2 + row, color);
+	// ---- MC-Stil-Helfer ---------------------------------------------------
+
+	/** Grauer Bevel-Rahmen wie Inventar/Container. */
+	private void panel(DrawContext c, int x, int y, int w, int h) {
+		c.fill(x - 1, y - 1, x + w + 1, y + h + 1, BLACK);
+		c.fill(x, y, x + w, y + h, BG);
+		c.fill(x, y, x + w, y + 2, HI);
+		c.fill(x, y, x + 2, y + h, HI);
+		c.fill(x, y + h - 2, x + w, y + h, SH);
+		c.fill(x + w - 2, y, x + w, y + h, SH);
+	}
+
+	/** Vertiefter Bereich (Slot-Look): dunkel oben/links, hell unten/rechts. */
+	private void recessed(DrawContext c, int x, int y, int w, int h) {
+		c.fill(x, y, x + w, y + h, SLOT);
+		c.fill(x, y, x + w, y + 1, SLOT_DARK);
+		c.fill(x, y, x + 1, y + h, SLOT_DARK);
+		c.fill(x, y + h - 1, x + w, y + h, HI);
+		c.fill(x + w - 1, y, x + w, y + h, HI);
+	}
+
+	private String ellipsis(String s, int maxW) {
+		if (this.textRenderer.getWidth(s) <= maxW) {
+			return s;
 		}
+		return this.textRenderer.trimToWidth(s, maxW - this.textRenderer.getWidth("…")) + "…";
+	}
+
+	// ---- Tooltip ----------------------------------------------------------
+
+	private List<Text> tooltip(ItemEntry e) {
+		List<Text> t = new ArrayList<>();
+		t.add(Text.literal(e.name()).withColor(tierColor(e.tier()) & 0xFFFFFF));
+		String sub = prettyKey(e.category());
+		if (e.tier() != null && !e.tier().isEmpty()) {
+			sub = (sub.isEmpty() ? "" : sub + " · ") + prettyKey(e.tier());
+		}
+		if (!sub.isEmpty()) {
+			t.add(Text.literal(sub).withColor(0xAAAAAA));
+		}
+		Map<String, Double> st = e.stats();
+		if (st != null && !st.isEmpty()) {
+			t.add(Text.literal(""));
+			for (Map.Entry<String, Double> s : st.entrySet()) {
+				if (s.getValue() == 0) {
+					continue;
+				}
+				String sign = s.getValue() > 0 ? "+" : "";
+				t.add(Text.literal(sign + num(s.getValue()) + " " + prettyKey(s.getKey())).withColor(0x55FF55));
+			}
+		}
+		if (e.npcSell() > 0) {
+			t.add(Text.literal("NPC: " + num(e.npcSell()) + " Coins").withColor(0xFFFF55));
+		}
+		return t;
+	}
+
+	private static String prettyKey(String k) {
+		if (k == null || k.isEmpty()) {
+			return "";
+		}
+		String[] parts = k.toLowerCase(Locale.ROOT).replace('_', ' ').split(" ");
+		StringBuilder b = new StringBuilder();
+		for (String p : parts) {
+			if (p.isEmpty()) {
+				continue;
+			}
+			b.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1)).append(' ');
+		}
+		return b.toString().trim();
+	}
+
+	private static String num(double v) {
+		if (v == Math.floor(v)) {
+			return String.valueOf((long) v);
+		}
+		return String.valueOf(v);
+	}
+
+	private static int tierColor(String tier) {
+		if (tier == null) {
+			return 0xFFFFFFFF;
+		}
+		return switch (tier.toUpperCase(Locale.ROOT)) {
+			case "UNCOMMON" -> 0xFF55FF55;
+			case "RARE" -> 0xFF5555FF;
+			case "EPIC" -> 0xFFAA00AA;
+			case "LEGENDARY" -> 0xFFFFAA00;
+			case "MYTHIC" -> 0xFFFF55FF;
+			case "DIVINE" -> 0xFF55FFFF;
+			case "SPECIAL", "VERY_SPECIAL" -> 0xFFFF5555;
+			case "SUPREME" -> 0xFFAA0000;
+			default -> 0xFFFFFFFF;
+		};
 	}
 
 	// ---- Eingabe ----------------------------------------------------------
@@ -268,18 +364,18 @@ public final class AuctionSearchScreen extends Screen {
 	@Override
 	public boolean keyPressed(KeyInput input) {
 		int k = input.key();
-		if (k == 257 || k == 335) { // Enter / Numpad-Enter
+		if (k == 257 || k == 335) {
 			submit(query);
 			return true;
 		}
-		if (k == 259) { // Backspace
+		if (k == 259) {
 			if (!query.isEmpty()) {
 				query = query.substring(0, query.length() - 1);
 				recompute();
 			}
 			return true;
 		}
-		if (k == 256) { // Esc -> Such-Menü schließen (zurück ins Spiel)
+		if (k == 256) {
 			close();
 			return true;
 		}
@@ -305,11 +401,7 @@ public final class AuctionSearchScreen extends Screen {
 		}
 	}
 
-	/**
-	 * Suche absenden: schickt das Sign-Update DIREKT als Packet (mit dem Suchtext
-	 * in Zeile 0) und schließt das Menü. So führt Hypixel die Suche aus, ohne dass
-	 * das Schild neu geöffnet wird (kein Reaktivieren -> keine Schleife).
-	 */
+	/** Suche absenden: Sign-Update direkt als Packet, dann Menü schließen. */
 	private void submit(String q) {
 		if (q == null) {
 			return;
@@ -360,29 +452,5 @@ public final class AuctionSearchScreen extends Screen {
 		}
 		Midgard.config.auctionHistory.clear();
 		Midgard.config.save();
-	}
-
-	// ---- Text-Helfer ------------------------------------------------------
-
-	private void txt(DrawContext c, String s, int x, int y, int color, boolean bold) {
-		if (!MidgardText.draw(c, s, x, y, FONT, color, bold)) {
-			c.drawText(this.textRenderer, s, x, y, color, false);
-		}
-	}
-
-	private int txtW(String s, boolean bold) {
-		int w = MidgardText.width(s, FONT, bold);
-		return w >= 0 ? w : this.textRenderer.getWidth(s);
-	}
-
-	/** Kürzt einen Text so, dass er in {@code maxW} Pixel passt (mit …). */
-	private String trim(String s, int maxW) {
-		if (txtW(s, false) <= maxW) {
-			return s;
-		}
-		while (s.length() > 1 && txtW(s + "…", false) > maxW) {
-			s = s.substring(0, s.length() - 1);
-		}
-		return s + "…";
 	}
 }
