@@ -128,8 +128,14 @@ public final class AuctionData {
 			apiLastUpdated = updated;
 			lastSuccessMs = System.currentTimeMillis();
 			progress = 1f;
+			int withSkin = 0;
+			for (Auction a : all) {
+				if (a.skinValue() != null && !a.skinValue().isEmpty()) {
+					withSkin++;
+				}
+			}
 			System.out.println("[Midgard] AuctionData: " + all.size() + " Auktionen ("
-					+ totalPages + " Seiten) geladen.");
+					+ totalPages + " Seiten) geladen, davon " + withSkin + " mit Skin.");
 		} catch (Exception e) {
 			System.err.println("[Midgard] AuctionData Laden fehlgeschlagen: " + e.getMessage());
 		} finally {

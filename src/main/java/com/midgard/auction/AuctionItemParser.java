@@ -6,8 +6,11 @@ import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.google.common.collect.LinkedHashMultimap;
+import com.google.common.collect.Multimap;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
+import com.mojang.authlib.properties.PropertyMap;
 
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.ProfileComponent;
@@ -84,15 +87,22 @@ public final class AuctionItemParser {
 		return built;
 	}
 
+	private static boolean loggedHeadError = false;
+
 	private static ItemStack buildHead(String value) {
 		try {
+			Multimap<String, Property> mm = LinkedHashMultimap.create();
+			mm.put("textures", new Property("textures", value));
 			GameProfile profile = new GameProfile(
-					UUID.nameUUIDFromBytes(value.getBytes(StandardCharsets.UTF_8)), "MidgardHead");
-			profile.properties().put("textures", new Property("textures", value));
+					UUID.nameUUIDFromBytes(value.getBytes(StandardCharsets.UTF_8)), "MidgardHead", new PropertyMap(mm));
 			ItemStack head = new ItemStack(Items.PLAYER_HEAD);
 			head.set(DataComponentTypes.PROFILE, ProfileComponent.ofStatic(profile));
 			return head;
 		} catch (Throwable t) {
+			if (!loggedHeadError) {
+				loggedHeadError = true;
+				System.err.println("[Midgard] Kopf-Bau fehlgeschlagen (Skins -> Papier): " + t);
+			}
 			return null;
 		}
 	}
