@@ -54,6 +54,20 @@ public final class ScoreboardReader {
 		return out;
 	}
 
+	/**
+	 * Aktueller Gebietsname aus der ⏣-Zeile der Sidebar (ohne Symbol), oder null.
+	 * In Crystal Hollows wechselt diese Zeile live mit dem Biom (Jungle, Mines of
+	 * Divan, Magma Fields …) – das ist die zuverlässige Quelle (wie SkyHanni).
+	 */
+	public static String currentArea(MinecraftClient mc) {
+		for (String line : sidebarLines(mc)) {
+			if (line != null && line.indexOf('⏣') >= 0) {
+				return line.replace("⏣", "").trim();
+			}
+		}
+		return null;
+	}
+
 	private static ScoreboardObjective sidebarObjective(MinecraftClient mc) {
 		if (mc.world == null) {
 			return null;

@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.midgard.Midgard;
 import com.midgard.events.config.ModConfig;
+import com.midgard.events.skyblock.ScoreboardReader;
 import com.midgard.mining.CrystalMap;
 import com.midgard.mining.CrystalNav;
 import com.midgard.mining.MiningData;
@@ -30,7 +31,6 @@ public final class MinimapHud {
 	private static final int PANEL = 0xE6121218;
 	private static final int BORDER = 0x55FFFFFF;
 	private static final int GRID = 0x22FFFFFF;
-	private static final int JUNGLE = 0x33B050FF;
 	private static final int NUCLEUS = 0xFFD06BFF;
 	private static final int AMBER = 0xFFF2A93B;
 	private static final int DIM = 0xFF8C8C97;
@@ -60,7 +60,12 @@ public final class MinimapHud {
 			renderFromMap(c, ms, x, y, mc);
 		} else {
 			renderFallback(c, x, y, mc);
-			txt(c, "Karte halten", x + 6, y + SIZE - 11, DIM, mc);
+		}
+		// Aktuelles Biom unten anzeigen (aus dem Scoreboard).
+		String area = ScoreboardReader.currentArea(mc);
+		if (area != null && !area.isEmpty()) {
+			c.fill(x, y + SIZE - 12, x + SIZE, y + SIZE, 0xAA000000);
+			txt(c, area, x + 4, y + SIZE - 10, 0xFFFFFFFF, mc);
 		}
 	}
 
@@ -117,10 +122,16 @@ public final class MinimapHud {
 	// ---- Ersatz OHNE Karte ------------------------------------------------
 
 	private void renderFallback(DrawContext c, int x, int y, MinecraftClient mc) {
-		c.fill(x, y, x + SIZE / 2, y + SIZE / 2, JUNGLE); // Jungle/Amethyst (fest, NW)
-		c.fill(x + SIZE / 2, y, x + SIZE / 2 + 1, y + SIZE, GRID);
-		c.fill(x, y + SIZE / 2, x + SIZE, y + SIZE / 2 + 1, GRID);
-		txt(c, "N", x + SIZE / 2 - 2, y + 1, DIM, mc);
+		int half = SIZE / 2;
+		// Feste Gemstone-Quadranten (Lage liegt geometrisch fest, X/Z um 512):
+		// Jungle NW, Mithril NE, Goblin SW, Precursor SE – sofort sichtbar.
+		c.fill(x, y, x + half, y + half, 0x44B050FF); // NW Jungle (Amethyst lila)
+		c.fill(x + half, y, x + SIZE, y + half, 0x4435C46A); // NE Mithril (Jade grün)
+		c.fill(x, y + half, x + half, y + SIZE, 0x44F2A93B); // SW Goblin (Amber orange)
+		c.fill(x + half, y + half, x + SIZE, y + SIZE, 0x444F9BFF); // SE Precursor (Sapphire blau)
+		c.fill(x + half, y, x + half + 1, y + SIZE, GRID);
+		c.fill(x, y + half, x + SIZE, y + half + 1, GRID);
+		txt(c, "N", x + half - 2, y + 1, DIM, mc);
 		for (Map.Entry<String, int[]> e : CrystalNav.learnedView().entrySet()) {
 			int[] p = e.getValue();
 			dot(c, mapX(x, p[0]), mapZ(y, p[2]), colorFor(e.getKey()));

@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15d (Pfad NIE durch Waende, Marker-Text via Spiel-Puffer, Boden/Luft-Slider)");
+		System.out.println("[Midgard] init build=2026-06-15f (Pfad in der Luft bleibt am Boden, Minimap 4 Quadranten-Farben sofort + Biom-Label)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

@@ -88,7 +88,9 @@ public final class PathFinder {
 		if (start.getManhattanDistance(goal) > 600) {
 			return straightFallback(start, goal);
 		}
-		BlockPos s = flying ? nearestPassable(world, start) : standable(world, start);
+		// Boden-Modus: liegt der Spieler in der Luft (Springen/Fliegen), den BODEN
+		// DARUNTER als Start nehmen -> der Pfad wird trotzdem (am Boden) angezeigt.
+		BlockPos s = flying ? nearestPassable(world, start) : standableStart(world, start);
 		if (s == null) {
 			return straightFallback(start, goal);
 		}
@@ -321,6 +323,24 @@ public final class PathFinder {
 			if (canStand(world, pos.up(dy))) {
 				return pos.up(dy);
 			}
+			if (canStand(world, pos.down(dy))) {
+				return pos.down(dy);
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Start-Block: erst normal (±2), dann TIEFER nach unten suchen. So findet die
+	 * Wegfindung den Boden auch, wenn der Spieler in der Luft ist (Springen/
+	 * Fliegen) – der Pfad bleibt am Boden sichtbar.
+	 */
+	private static BlockPos standableStart(ClientWorld world, BlockPos pos) {
+		BlockPos s = standable(world, pos);
+		if (s != null) {
+			return s;
+		}
+		for (int dy = 3; dy <= 30; dy++) {
 			if (canStand(world, pos.down(dy))) {
 				return pos.down(dy);
 			}
