@@ -32,6 +32,7 @@ public class Midgard implements ClientModInitializer {
 
 	private static KeyBinding openConfigKey;
 	private static KeyBinding toggleHudKey;
+	private static KeyBinding debugDumpKey;
 
 	private int tickCounter = 0;
 
@@ -46,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15n (TIEFEN-LAYER-FIX: Pfad nicht mehr durch Waende! + Goblin-Erkennung im Goblin-Gebiet)");
+		System.out.println("[Midgard] init build=2026-06-15o (Debug-Abteilung: M-Taste dumpt Entities in Chat + In-Welt-Labels)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -71,6 +72,13 @@ public class Midgard implements ClientModInitializer {
 				GLFW.GLFW_KEY_UNKNOWN, // standardmäßig nicht belegt
 				category));
 
+		// Debug: nahe Entities (Name/ID/Typ/Position) in den Chat dumpen.
+		debugDumpKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+				"key.midgard.debugdump",
+				InputUtil.Type.KEYSYM,
+				GLFW.GLFW_KEY_M,
+				category));
+
 		// Abgebaute Blöcke an den Farming-Tracker melden (Blöcke/s + Crop-Erkennung).
 		net.fabricmc.fabric.api.event.client.player.ClientPlayerBlockBreakEvents.AFTER.register(
 				(world, player, pos, state) -> com.midgard.garden.FarmingTracker.INSTANCE.onBlockBroken(state));
@@ -90,6 +98,12 @@ public class Midgard implements ClientModInitializer {
 				com.midgard.util.WorldTextRenderer.render(ctx, com.midgard.mining.MiningWaypoints.markers());
 			} catch (Throwable t) {
 				logOnce("Text3D", t);
+			}
+			// Debug: Entity-Namen/IDs über den Köpfen (nur wenn im Menü aktiviert).
+			try {
+				com.midgard.util.DebugTools.renderLabels(ctx);
+			} catch (Throwable t) {
+				logOnce("DebugLabels", t);
 			}
 		});
 
@@ -151,6 +165,9 @@ public class Midgard implements ClientModInitializer {
 			while (toggleHudKey.wasPressed()) {
 				config.masterEnabled = !config.masterEnabled;
 				config.save();
+			}
+			while (debugDumpKey.wasPressed()) {
+				com.midgard.util.DebugTools.dumpToChat(client);
 			}
 
 			// Jeden Tick: offenes Kalender-/Jacob-GUI auslesen (nur lesend).

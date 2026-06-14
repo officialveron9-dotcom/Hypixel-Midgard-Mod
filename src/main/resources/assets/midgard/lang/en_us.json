@@ -2,5 +2,6 @@
 	"category.midgard": "Midgard",
 	"key.midgard.openconfig": "Open Settings",
 	"key.midgard.togglehud": "Toggle Event HUD",
+	"key.midgard.debugdump": "Debug: dump entities to chat",
 	"key.midgard.crystalnav": "Open Crystal Hollows Nav"
 }

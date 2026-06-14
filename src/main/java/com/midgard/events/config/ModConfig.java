@@ -74,6 +74,14 @@ public class ModConfig {
 	public boolean pathTeleport = false;
 	/** Mini-Karte in Crystal Hollows (Mitte/Jungle fest, Spieler + gelernte Punkte). */
 	public boolean chMinimap = true;
+
+	// --- Debug ---------------------------------------------------------------
+	/** Debug-Abteilung aktiv (M-Taste dumpt Entities in den Chat). */
+	public boolean debugEnabled = false;
+	/** Entity-Namen/IDs in der Welt über den Köpfen anzeigen. */
+	public boolean debugEntityLabels = false;
+	/** Auch unbenannte Entities (Mobs/Items/Orbs) einbeziehen, nicht nur benannte NPCs. */
+	public boolean debugIncludeAll = false;
 	/** Gelernte Emissär-Positionen je Gebiets-Stichwort ([x,y,z]) – einmal gesehen, dauerhaft gemerkt. */
 	public Map<String, List<Integer>> learnedEmissary = new HashMap<>();
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */

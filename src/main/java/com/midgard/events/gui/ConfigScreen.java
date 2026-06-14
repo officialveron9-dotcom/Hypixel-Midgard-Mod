@@ -93,7 +93,8 @@ public class ConfigScreen extends Screen {
 			new Tab("Allgemein", false, 0xFFFFFFFF),
 			new Tab("Auktion", false, 0xFFFFC85C),
 			new Tab("Garden", false, 0xFF5BE36B),
-			new Tab("Mining", false, 0xFF4DA6FF));
+			new Tab("Mining", false, 0xFF4DA6FF),
+			new Tab("Debug", false, 0xFFFF6B6B));
 
 	/** Aktuelle Sucheingabe (oben links); leer = normale Tab-Ansicht. */
 	private String search = "";
@@ -256,6 +257,7 @@ public class ConfigScreen extends Screen {
 			buildAuctionRows(rows, context, mouseX, mouseY, cardX, cardW);
 			buildGardenRows(rows, context, mouseX, mouseY, cardX, cardW);
 			buildMiningRows(rows, context, mouseX, mouseY, cardX, cardW);
+			buildDebugRows(rows, context, mouseX, mouseY, cardX, cardW);
 			String q = search.toLowerCase();
 			rows.removeIf(r -> !r.search().toLowerCase().contains(q));
 		} else {
@@ -266,6 +268,8 @@ public class ConfigScreen extends Screen {
 				buildMiningRows(rows, context, mouseX, mouseY, cardX, cardW);
 			} else if (tab.label().equals("Auktion")) {
 				buildAuctionRows(rows, context, mouseX, mouseY, cardX, cardW);
+			} else if (tab.label().equals("Debug")) {
+				buildDebugRows(rows, context, mouseX, mouseY, cardX, cardW);
 			} else {
 				buildGeneralRows(rows, context, mouseX, mouseY, cardX, cardW);
 			}
@@ -396,6 +400,26 @@ public class ConfigScreen extends Screen {
 					cfg.pathTeleport = !cfg.pathTeleport;
 					cfg.save();
 				}));
+	}
+
+	private void buildDebugRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
+		out.add(infoRow(context, cardX, "Taste M = nahe NPCs/Entities (Name · Typ · ID · Position) in den Chat."));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Debug aktiv (In-Welt-Labels erlauben)",
+				() -> cfg.debugEnabled, () -> {
+					cfg.debugEnabled = !cfg.debugEnabled;
+					cfg.save();
+				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Namen/IDs in der Welt über den Köpfen",
+				() -> cfg.debugEntityLabels, () -> {
+					cfg.debugEntityLabels = !cfg.debugEntityLabels;
+					cfg.save();
+				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Alles zeigen (auch Items/Orbs, nicht nur NPCs)",
+				() -> cfg.debugIncludeAll, () -> {
+					cfg.debugIncludeAll = !cfg.debugIncludeAll;
+					cfg.save();
+				}));
+		out.add(infoRow(context, cardX, "Tipp: nah an den NPC ran, dann M drücken und mir den Namen schicken."));
 	}
 
 	/** Reine Info-/Hinweiszeile (nicht klickbar). */
