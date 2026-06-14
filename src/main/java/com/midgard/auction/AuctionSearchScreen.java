@@ -305,7 +305,11 @@ public final class AuctionSearchScreen extends Screen {
 		}
 	}
 
-	/** Suche absenden: Text ins Original-Schild schreiben + schließen -> Hypixel sucht. */
+	/**
+	 * Suche absenden: schickt das Sign-Update DIREKT als Packet (mit dem Suchtext
+	 * in Zeile 0) und schließt das Menü. So führt Hypixel die Suche aus, ohne dass
+	 * das Schild neu geöffnet wird (kein Reaktivieren -> keine Schleife).
+	 */
 	private void submit(String q) {
 		if (q == null) {
 			return;
@@ -317,18 +321,16 @@ public final class AuctionSearchScreen extends Screen {
 		addHistory(q);
 		MinecraftClient mc = MinecraftClient.getInstance();
 		try {
-			String[] msgs = origin.messages;
-			if (msgs != null && msgs.length > 0) {
-				msgs[0] = q;
-				for (int i = 1; i < msgs.length; i++) {
-					msgs[i] = "";
-				}
+			net.minecraft.block.entity.SignBlockEntity be = origin.blockEntity;
+			net.minecraft.util.math.BlockPos pos = be.getPos();
+			if (mc.getNetworkHandler() != null) {
+				mc.getNetworkHandler().sendPacket(
+						new net.minecraft.network.packet.c2s.play.UpdateSignC2SPacket(pos, true, q, "", "", ""));
 			}
-			origin.close(); // -> finishEditing() schickt das Sign-Update = die Suche
 		} catch (Throwable t) {
 			System.err.println("[Midgard] Auktions-Suche absenden fehlgeschlagen: " + t);
-			mc.setScreen(origin); // Notfall: das echte Schild zeigen
 		}
+		mc.setScreen(null);
 	}
 
 	private void addHistory(String q) {

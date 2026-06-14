@@ -6,5 +6,6 @@ accessible	method	net/minecraft/client/render/RenderLayer	of	(Ljava/lang/String;
 # POSITION_COLOR-Snippet (Shader+Uniforms) zum Ableiten der Pipeline
 accessible	field	net/minecraft/client/gl/RenderPipelines	POSITION_COLOR_SNIPPET	Lcom/mojang/blaze3d/pipeline/RenderPipeline$Snippet;
 
-# Schild-Zeilen der Hypixel-AH-Suche lesen/setzen (eigene Auktions-Suche)
+# Schild-Zeilen + Block-Position der Hypixel-AH-Suche (eigene Auktions-Suche)
 accessible	field	net/minecraft/client/gui/screen/ingame/AbstractSignEditScreen	messages	[Ljava/lang/String;
+accessible	field	net/minecraft/client/gui/screen/ingame/AbstractSignEditScreen	blockEntity	Lnet/minecraft/block/entity/SignBlockEntity;

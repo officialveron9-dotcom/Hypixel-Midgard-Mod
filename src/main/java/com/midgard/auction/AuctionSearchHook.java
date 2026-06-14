@@ -20,6 +20,8 @@ public final class AuctionSearchHook {
 
 	private static String lastLoggedKey = "";
 	private static volatile AbstractSignEditScreen pending;
+	/** true = das Schild soll beim Ersetzen NICHT automatisch senden (Mixin liest das). */
+	public static volatile boolean suppressSignSend = false;
 
 	private AuctionSearchHook() {
 	}
@@ -52,7 +54,15 @@ public final class AuctionSearchHook {
 			if (cur == sign || cur == null || cur instanceof AbstractSignEditScreen) {
 				System.out.println("[Midgard] -> AuctionSearchScreen wird gesetzt (vorher: "
 						+ (cur == null ? "null" : cur.getClass().getSimpleName()) + ")");
-				client.setScreen(new AuctionSearchScreen(sign));
+				// Beim Ersetzen darf das Schild NICHT senden (sonst öffnet Hypixel
+				// es sofort neu -> Schleife). Das Senden der echten Suche macht das
+				// Menü selbst per Packet.
+				suppressSignSend = true;
+				try {
+					client.setScreen(new AuctionSearchScreen(sign));
+				} finally {
+					suppressSignSend = false;
+				}
 			} else {
 				System.out.println("[Midgard] -> nicht umgeschaltet, aktueller Screen: "
 						+ cur.getClass().getSimpleName());
