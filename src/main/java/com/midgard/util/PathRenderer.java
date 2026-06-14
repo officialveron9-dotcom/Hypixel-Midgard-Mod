@@ -76,6 +76,7 @@ public final class PathRenderer {
 		net.minecraft.world.World w = mc.world;
 		boolean hideBehind = com.midgard.Midgard.config == null || com.midgard.Midgard.config.pathHideBehindWalls;
 		double rendered = 0;
+		int nDraw = 0, nSolid = 0, nOcc = 0;
 		outer:
 		for (int i = 0; i + 1 < rp.size(); i++) {
 			Vec3d a = rp.get(i), b = rp.get(i + 1);
@@ -83,7 +84,7 @@ public final class PathRenderer {
 			if (segLen < 1e-6) {
 				continue;
 			}
-			int steps = Math.max(1, (int) Math.ceil(segLen / 0.5));
+			int steps = Math.max(1, (int) Math.ceil(segLen / 0.35));
 			for (int k = 0; k < steps; k++) {
 				if (rendered > MAX_RENDER) {
 					break outer;
@@ -94,21 +95,35 @@ public final class PathRenderer {
 				Vec3d mid = lerp(p0, p1, 0.5);
 				// 1) Stück IM Block -> nie zeichnen (steckt in der Wand).
 				if (isSolid(w, mid)) {
+					nSolid++;
 					continue;
 				}
 				// 2) Stück HINTER einer Wand (von der Kamera aus) -> nicht zeichnen.
-				// CPU-Sichtprüfung statt GPU-Tiefentest -> die Linie geht NIE sichtbar
-				// durch eine Wand, egal was die Render-Pipeline macht.
+				// CPU-Sichtprüfung von der Kamera zur Stück-Mitte (feine Schritte ->
+				// Mitte ist repräsentativ). Statt GPU-Tiefentest.
 				if (hideBehind && occluded(w, cam, mid, mc.player)) {
+					nOcc++;
 					continue;
 				}
 				tube(vc, m, p0, p1, 0.085f, 0.05f, ALPHA);
+				nDraw++;
 			}
 		}
 
 		ms.pop();
 		immediate.draw();
+
+		// Diagnose: alle 2 s die Zahlen ins Log (zeigt, ob die Sichtprüfung greift).
+		long now = System.currentTimeMillis();
+		if (now - lastDbgMs > 2000) {
+			lastDbgMs = now;
+			System.out.println("[Midgard] PathDbg hideBehind=" + hideBehind + " pathPkt=" + path.size()
+					+ " rp=" + rp.size() + " gezeichnet=" + nDraw + " imBlock=" + nSolid + " verdeckt=" + nOcc
+					+ " depthLayer=" + (MidgardLayers.depthQuads() != null));
+		}
 	}
+
+	private static long lastDbgMs = 0;
 
 	/** Liegt der Punkt in einem soliden (kollidierenden) Block? */
 	private static boolean isSolid(net.minecraft.world.World w, Vec3d p) {

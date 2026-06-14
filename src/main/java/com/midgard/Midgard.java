@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15u (Pfad-Linie: CPU-Sichtpruefung Kamera->Linie, geht NIE mehr sichtbar durch Wand; Debug-Schalter)");
+		System.out.println("[Midgard] init build=2026-06-15v (Diagnose: PathDbg-Log zaehlt gezeichnet/verdeckt/imBlock - zur Fehlersuche durch-Wand)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
