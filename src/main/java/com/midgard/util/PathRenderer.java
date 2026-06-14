@@ -81,6 +81,63 @@ public final class PathRenderer {
 	}
 
 	/**
+	 * Zeichnet an jedem Wegpunkt einen senkrechten LEUCHT-STRAHL (wie ein Beacon).
+	 * Bewusst OHNE Tiefentest (durch Wände sichtbar) – so sieht man das Ziel und
+	 * die Richtung von überall, auch wenn die Bodenlinie verdeckt ist.
+	 */
+	public static void renderBeams(WorldRenderContext ctx, List<Waypoints.Marker> markers) {
+		if (markers == null || markers.isEmpty()) {
+			return;
+		}
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (mc.gameRenderer == null || mc.gameRenderer.getCamera() == null) {
+			return;
+		}
+		MatrixStack ms = ctx.matrices();
+		if (ms == null) {
+			return;
+		}
+		Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
+		if (immediate == null) {
+			allocator = new BufferAllocator(1 << 16);
+			immediate = VertexConsumerProvider.immediate(allocator);
+		}
+		ms.push();
+		ms.translate(-cam.x, -cam.y, -cam.z);
+		Matrix4f m = ms.peek().getPositionMatrix();
+		VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
+		for (Waypoints.Marker mk : markers) {
+			beam(vc, m, mk.x() + 0.5, mk.y(), mk.z() + 0.5, 28f, 0.16f, mk.color());
+		}
+		ms.pop();
+		immediate.draw();
+	}
+
+	/** Senkrechter Strahl (4-seitige Säule) mit Alpha-Verlauf nach oben. */
+	private static void beam(VertexConsumer vc, Matrix4f m, double cx, double by, double cz, float height, float hw,
+			int argb) {
+		int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
+		float x0 = (float) (cx - hw), x1 = (float) (cx + hw);
+		float z0 = (float) (cz - hw), z1 = (float) (cz + hw);
+		float y0 = (float) by, y1 = (float) (by + height);
+		int aB = 150, aT = 6;
+		gquad(vc, m, r, g, b, x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0, aB, aT);
+		gquad(vc, m, r, g, b, x1, y0, z1, x0, y0, z1, x0, y1, z1, x1, y1, z1, aB, aT);
+		gquad(vc, m, r, g, b, x0, y0, z1, x0, y0, z0, x0, y1, z0, x0, y1, z1, aB, aT);
+		gquad(vc, m, r, g, b, x1, y0, z0, x1, y0, z1, x1, y1, z1, x1, y1, z0, aB, aT);
+	}
+
+	/** Quad mit unten (aB) / oben (aT) unterschiedlicher Transparenz. */
+	private static void gquad(VertexConsumer vc, Matrix4f m, int r, int g, int b,
+			float x1, float y1, float z1, float x2, float y2, float z2,
+			float x3, float y3, float z3, float x4, float y4, float z4, int aB, int aT) {
+		vc.vertex(m, x1, y1, z1).color(r, g, b, aB);
+		vc.vertex(m, x2, y2, z2).color(r, g, b, aB);
+		vc.vertex(m, x3, y3, z3).color(r, g, b, aT);
+		vc.vertex(m, x4, y4, z4).color(r, g, b, aT);
+	}
+
+	/**
 	 * Projiziert den Spieler (nur X/Z) auf den Pfad und liefert die Punkte ab
 	 * {@code START_AHEAD} Blöcken davor bis zum Ziel. Smooth (kein Springen),
 	 * der Anfang liegt vor dem Spieler statt in ihm.

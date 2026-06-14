@@ -2,32 +2,31 @@ package com.midgard.util;
 
 import java.util.List;
 
-import org.joml.Matrix4f;
-
 import com.midgard.util.Waypoints.Marker;
 
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.BufferAllocator;
+import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
+import net.minecraft.text.TextColor;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 /**
- * Zeichnet Wegpunkt-Labels (Name + Entfernung) als Billboard-Text ECHT in der
- * 3D-Welt – wie Skyblocker, mit Minecrafts eingebautem {@link TextRenderer}
- * (kein externes Font-Mod). Nutzt den GLEICHEN Mechanismus wie die Pfad-Linie:
- * eigener {@link VertexConsumerProvider.Immediate} + selbst {@code draw()}.
- *
- * <p>Wichtige Details (häufige Fehlerquellen): Farbe als ARGB mit Alpha=0xFF
- * (sonst unsichtbar), {@code light=0xF000F0} (full bright), SEE_THROUGH (durch
- * Wände), kamera-relativ, Billboard über die Kamera-Rotation, Skalierung 0.025.</p>
+ * Zeichnet Wegpunkt-Labels (Name + Entfernung) ECHT in der 3D-Welt – wie
+ * Skyblocker. WICHTIG für 1.21.11: das geht über das NEUE Submit-System, nicht
+ * mehr über einen eigenen Vertex-Puffer. Vanilla rendert Namensschilder so:
+ * {@code commandQueue.submitLabel(matrices, pos, bg, text, seeThrough, light,
+ * distSq, cameraState)}. Die Engine batcht und zeichnet die Labels selbst (kein
+ * eigenes draw()).
  */
 public final class WorldTextRenderer {
-
-	private static BufferAllocator allocator;
-	private static VertexConsumerProvider.Immediate immediate;
 
 	private WorldTextRenderer() {
 	}
@@ -38,44 +37,43 @@ public final class WorldTextRenderer {
 		}
 		MinecraftClient mc = MinecraftClient.getInstance();
 		MatrixStack ms = ctx.matrices();
-		if (ms == null || mc.gameRenderer == null || mc.gameRenderer.getCamera() == null) {
+		OrderedRenderCommandQueue queue = ctx.commandQueue();
+		if (ms == null || queue == null || mc.gameRenderer == null || mc.gameRenderer.getCamera() == null) {
 			return;
 		}
-		Vec3d cam = mc.gameRenderer.getCamera().getCameraPos();
-		TextRenderer tr = mc.textRenderer;
-		if (immediate == null) {
-			allocator = new BufferAllocator(1 << 16);
-			immediate = VertexConsumerProvider.immediate(allocator);
-		}
+		Camera camera = mc.gameRenderer.getCamera();
+		Vec3d cam = camera.getCameraPos();
+
+		// Kamera-Zustand selbst befüllen (für das Billboard der Labels).
+		CameraRenderState crs = new CameraRenderState();
+		crs.pos = cam;
+		crs.entityPos = cam;
+		crs.orientation = camera.getRotation();
+		crs.blockPos = BlockPos.ofFloored(cam);
+		crs.initialized = true;
 
 		for (Marker m : markers) {
 			try {
 				double wx = m.x() + 0.5, wy = m.y() + 1.4, wz = m.z() + 0.5;
 				double dx = wx - cam.x, dy = wy - cam.y, dz = wz - cam.z;
-				double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-				if (dist > 500) {
+				double dsq = dx * dx + dy * dy + dz * dz;
+				if (dsq > 500 * 500) {
 					continue;
 				}
-				float s = 0.025f * (float) Math.max(1.0, dist / 12.0); // lesbar mit Entfernung
-				String name = m.label();
-				String distLine = Math.round(dist) + "m";
-				int nameColor = 0xFF000000 | (m.color() & 0xFFFFFF); // Alpha FF erzwingen
+				int dist = (int) Math.round(Math.sqrt(dsq));
+				MutableText text = Text.literal(m.label())
+						.setStyle(Style.EMPTY.withColor(TextColor.fromRgb(m.color() & 0xFFFFFF)));
+				text.append(Text.literal("  " + dist + "m").formatted(Formatting.GRAY));
 
 				ms.push();
 				ms.translate(dx, dy, dz);
-				// Billboard: zur Kamera drehen (über die Positionsmatrix – robust).
-				ms.multiplyPositionMatrix(new Matrix4f().rotate(mc.gameRenderer.getCamera().getRotation()));
-				ms.scale(-s, -s, s);
-				Matrix4f mat = ms.peek().getPositionMatrix();
-				tr.draw(name, -tr.getWidth(name) / 2f, -9f, nameColor, false, mat, immediate,
-						TextRenderer.TextLayerType.SEE_THROUGH, 0, 0xF000F0);
-				tr.draw(distLine, -tr.getWidth(distLine) / 2f, 1f, 0xFFFFFFFF, false, mat, immediate,
-						TextRenderer.TextLayerType.SEE_THROUGH, 0, 0xF000F0);
+				// matrices an der Marker-Position, pos=ZERO, bg=0, seeThrough=true,
+				// light=full bright, distSq, Kamera-Zustand.
+				queue.submitLabel(ms, Vec3d.ZERO, 0, text, true, 0xF000F0, dsq, crs);
 				ms.pop();
 			} catch (Throwable ignored) {
 				// ein einzelnes Label darf nie alles abreißen
 			}
 		}
-		immediate.draw(); // selbst flushen – exakt wie bei der Pfad-Linie
 	}
 }
