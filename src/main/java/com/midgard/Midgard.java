@@ -32,6 +32,7 @@ public class Midgard implements ClientModInitializer {
 
 	private static KeyBinding openConfigKey;
 	private static KeyBinding toggleHudKey;
+	private static KeyBinding crystalNavKey;
 
 	private int tickCounter = 0;
 
@@ -46,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14n (Crystal Hollows: Wegpunkt zum Crystal Nucleus, feste Mitte)");
+		System.out.println("[Midgard] init build=2026-06-14o (Crystal-Hollows-Navi: Orte-Liste per Taste N, Klick = navigieren, Abbrechen)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -69,6 +70,12 @@ public class Midgard implements ClientModInitializer {
 				"key.midgard.togglehud",
 				InputUtil.Type.KEYSYM,
 				GLFW.GLFW_KEY_UNKNOWN, // standardmäßig nicht belegt
+				category));
+
+		crystalNavKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+				"key.midgard.crystalnav",
+				InputUtil.Type.KEYSYM,
+				GLFW.GLFW_KEY_N,
 				category));
 
 		// Abgebaute Blöcke an den Farming-Tracker melden (Blöcke/s + Crop-Erkennung).
@@ -122,6 +129,9 @@ public class Midgard implements ClientModInitializer {
 				config.masterEnabled = !config.masterEnabled;
 				config.save();
 			}
+			while (crystalNavKey.wasPressed()) {
+				client.setScreen(new com.midgard.events.gui.NavScreen(client.currentScreen));
+			}
 
 			// Jeden Tick: offenes Kalender-/Jacob-GUI auslesen (nur lesend).
 			JacobCalendarReader.INSTANCE.tick(client);
@@ -137,10 +147,15 @@ public class Midgard implements ClientModInitializer {
 				com.midgard.garden.GardenData.INSTANCE.update(client);
 				com.midgard.mining.MiningData.INSTANCE.update(client);
 				com.midgard.mining.MiningWaypoints.tick(client);
-				// Wegfinder zum nächsten Ziel aktualisieren (oder löschen).
+				com.midgard.mining.CrystalNav.tick(client);
+				// Wegfinder: gewähltes Navi-Ziel (Crystal Hollows) hat Vorrang,
+				// sonst der nächste automatische Wegpunkt.
 				if (config.miningPathLine) {
+					double[] nav = com.midgard.mining.CrystalNav.target();
 					com.midgard.util.Waypoints.Marker tgt = com.midgard.mining.MiningWaypoints.nearest();
-					if (tgt != null) {
+					if (nav != null) {
+						com.midgard.util.PathFinder.update(nav[0], nav[1], nav[2], config.pathTeleport);
+					} else if (tgt != null) {
 						com.midgard.util.PathFinder.update(tgt.x(), tgt.y(), tgt.z(), config.pathTeleport);
 					} else {
 						com.midgard.util.PathFinder.clear();

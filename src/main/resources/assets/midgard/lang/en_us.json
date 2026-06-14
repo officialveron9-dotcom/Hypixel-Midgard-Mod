@@ -1,5 +1,6 @@
 {
 	"category.midgard": "Midgard",
 	"key.midgard.openconfig": "Open Settings",
-	"key.midgard.togglehud": "Toggle Event HUD"
+	"key.midgard.togglehud": "Toggle Event HUD",
+	"key.midgard.crystalnav": "Open Crystal Hollows Nav"
 }

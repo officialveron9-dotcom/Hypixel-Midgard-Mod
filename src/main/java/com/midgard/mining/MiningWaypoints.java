@@ -68,9 +68,14 @@ public final class MiningWaypoints {
 		boolean comWp = Midgard.config.miningCommissionWaypoints;
 		List<Marker> out = new ArrayList<>();
 
-		// Crystal Hollows: Wegpunkt zur Mitte (Crystal Nucleus, feste Koordinate).
+		// Crystal Hollows: gewähltes Navi-Ziel zeigen, sonst die Mitte (Nucleus).
 		if (comWp && MiningData.INSTANCE.onCrystalHollows) {
-			out.add(new Marker(NUCLEUS[0], NUCLEUS[1], NUCLEUS[2], "Crystal Nucleus", NUCLEUS_COLOR));
+			double[] nav = CrystalNav.target();
+			if (nav != null) {
+				out.add(new Marker(nav[0], nav[1], nav[2], CrystalNav.targetName(), NUCLEUS_COLOR));
+			} else {
+				out.add(new Marker(NUCLEUS[0], NUCLEUS[1], NUCLEUS[2], "Crystal Nucleus", NUCLEUS_COLOR));
+			}
 		}
 
 		// Entities einmal scannen: Goblins/Golems (für Mobs) UND Emissäre (um
