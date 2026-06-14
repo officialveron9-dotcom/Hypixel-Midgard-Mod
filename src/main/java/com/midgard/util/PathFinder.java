@@ -22,7 +22,9 @@ import net.minecraft.util.math.Vec3d;
  */
 public final class PathFinder {
 
-	private static final int MAX_EXPAND = 7000;
+	private static final int MAX_EXPAND = 5000;
+	/** Hartes Zeitbudget pro Berechnung – kappt jeden Ruckler (≈ ein halber Frame). */
+	private static final long BUDGET_NS = 5_000_000;
 	/** Mindestabstand (Blöcke), den man sich bewegen muss, bevor neu gerechnet wird. */
 	private static final int MOVE_THRESHOLD = 8;
 	/** Sonst nur selten neu rechnen (Linie bleibt ruhig stehen). */
@@ -32,6 +34,14 @@ public final class PathFinder {
 	private static BlockPos lastStart;
 	private static BlockPos lastGoal;
 	private static long lastCalcMs = 0;
+
+	/**
+	 * Begehbarkeits-Cache pro Berechnung: {@code getCollisionShape} ist teuer und
+	 * jeder Block wird als Nachbar mehrfach geprüft. Einmal pro Block je A*-Lauf
+	 * abfragen spart den Großteil der Arbeit -> deutlich weniger FPS-Einbruch.
+	 * Nur auf dem Client-Thread benutzt, daher kein Threading nötig.
+	 */
+	private static final Map<Long, Boolean> passCache = new HashMap<>();
 
 	private PathFinder() {
 	}
@@ -72,9 +82,18 @@ public final class PathFinder {
 		lastGoal = goal;
 		lastCalcMs = now;
 
+		List<Vec3d> result;
 		try {
-			path = astar(mc.world, start, goal);
+			result = astar(mc.world, start, goal);
 		} catch (Throwable t) {
+			result = List.of();
+		}
+		// Stabil: einen NEUEN gültigen Weg übernehmen. Kommt diesmal nichts heraus
+		// (kurzzeitig kein Weg), den alten behalten – außer das Ziel wechselte. So
+		// verschwindet die Linie nicht mehr zufällig zwischendurch.
+		if (!result.isEmpty()) {
+			path = result;
+		} else if (goalChanged) {
 			path = List.of();
 		}
 	}
@@ -85,6 +104,11 @@ public final class PathFinder {
 	}
 
 	private static List<Vec3d> astar(ClientWorld world, BlockPos start, BlockPos goal) {
+		passCache.clear(); // Begehbarkeits-Cache für genau diesen Lauf
+		if (passCache.size() > 200_000) {
+			passCache.clear();
+		}
+		long deadline = System.nanoTime() + BUDGET_NS;
 		if (start.getManhattanDistance(goal) > 600) {
 			return straightFallback(start, goal);
 		}
@@ -107,6 +131,10 @@ public final class PathFinder {
 		int expand = 0;
 
 		while (!open.isEmpty() && expand++ < MAX_EXPAND) {
+			// Harte Zeitgrenze: lieber ein Teilweg als ein Frame-Ruckler.
+			if ((expand & 255) == 0 && System.nanoTime() > deadline) {
+				break;
+			}
 			Node cur = open.poll();
 			BlockPos cp = cur.pos;
 			double ch = heur(cp, target);
@@ -165,9 +193,31 @@ public final class PathFinder {
 			}
 		}
 		// Kein voller Weg gefunden -> Teilweg bis zum nächstgelegenen Punkt
-		// (folgt dem Boden). Wenn gar nichts geht: KEINE Linie (lieber nichts als
-		// eine gerade Linie durch die Wand).
-		return bestNode.equals(s) ? List.of() : build(world, came, bestNode, s);
+		// (folgt dem Boden). Kommt man horizontal NICHT voran (eingeschlossen),
+		// nach OBEN auf einen offenen Schacht zeigen, statt durch die Wand.
+		return bestNode.equals(s) ? verticalEscape(world, s) : build(world, came, bestNode, s);
+	}
+
+	/**
+	 * Eingeschlossen: gibt es über dem Spieler einen offenen Schacht, zeigt die
+	 * Linie senkrecht nach oben (dort ist der Ausweg). Sonst keine Linie – nie
+	 * durch einen Block.
+	 */
+	private static List<Vec3d> verticalEscape(ClientWorld world, BlockPos s) {
+		int topDy = 0;
+		for (int dy = 1; dy <= 16; dy++) {
+			if (!passable(world, s.up(dy))) {
+				break;
+			}
+			topDy = dy;
+		}
+		if (topDy < 2) {
+			return List.of(); // kein Platz nach oben
+		}
+		List<Vec3d> pts = new ArrayList<>();
+		pts.add(new Vec3d(s.getX() + 0.5, s.getY() + 0.5, s.getZ() + 0.5));
+		pts.add(new Vec3d(s.getX() + 0.5, s.getY() + topDy + 0.5, s.getZ() + 0.5));
+		return pts;
 	}
 
 	private static double heur(BlockPos a, BlockPos b) {
@@ -202,7 +252,9 @@ public final class PathFinder {
 		Collections.reverse(nodes);
 		List<Vec3d> pts = new ArrayList<>();
 		for (BlockPos p : nodes) {
-			pts.add(new Vec3d(p.getX() + 0.5, p.getY() + 0.08, p.getZ() + 0.5));
+			// Einen halben Block ÜBER dem Boden -> besser sichtbar, klebt nicht im
+			// Boden/an der Wandkante (p.getY() ist der Fuß-Block, Boden = darunter).
+			pts.add(new Vec3d(p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5));
 		}
 		// Douglas-Peucker, aber WAND-BEWUSST: ein Abschnitt wird nur dann gerade
 		// gezogen, wenn die Luftlinie wirklich frei ist (sonst bleibt ein
@@ -292,18 +344,22 @@ public final class PathFinder {
 
 	// ---- Begehbarkeit -----------------------------------------------------
 
-	/** Block frei begehbar (keine Kollision)? */
+	/** Block frei begehbar (keine Kollision)? – gecacht pro A*-Lauf. */
 	private static boolean passable(ClientWorld world, BlockPos pos) {
-		return world.getBlockState(pos).getCollisionShape(world, pos).isEmpty();
+		long k = pos.asLong();
+		Boolean v = passCache.get(k);
+		if (v != null) {
+			return v;
+		}
+		boolean r = world.getBlockState(pos).getCollisionShape(world, pos).isEmpty();
+		passCache.put(k, r);
+		return r;
 	}
 
 	/** Kann die Figur hier stehen (Boden fest, Füße + Kopf frei)? */
 	private static boolean canStand(ClientWorld world, BlockPos pos) {
-		if (!passable(world, pos) || !passable(world, pos.up())) {
-			return false;
-		}
-		BlockPos below = pos.down();
-		return !world.getBlockState(below).getCollisionShape(world, below).isEmpty();
+		// Boden fest = unter den Füßen NICHT begehbar (Kollision vorhanden).
+		return passable(world, pos) && passable(world, pos.up()) && !passable(world, pos.down());
 	}
 
 	/** Füße + Kopf frei (keine Kollision) – für die Sichtlinien-Prüfung. */

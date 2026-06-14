@@ -163,29 +163,41 @@ public final class MinimapHud {
 
 	private void renderFallback(DrawContext c, int x, int y, MinecraftClient mc) {
 		int half = SIZE / 2;
-		// CH-Gebiete liegen als Kreuz um die Mitte (512). Diagonal-Split (X-Form):
-		// Nord = Mithril (blau), Süd = Goblin (braun), West = Jungle (grün),
-		// Ost = Precursor (grau) – wie auf der echten Karte. Sofort sichtbar.
-		for (int j = 0; j < SIZE; j += 2) {
-			int dz = j + 1 - half;
-			for (int i = 0; i < SIZE; i += 2) {
-				int dx = i + 1 - half;
-				int col;
-				if (Math.abs(dx) >= Math.abs(dz)) {
-					col = dx < 0 ? F_JUNGLE : F_PRECURSOR; // West / Ost
-				} else {
-					col = dz < 0 ? F_MITHRIL : F_GOBLIN;   // Nord / Süd
-				}
-				c.fill(x + i, y + j, x + i + 2, y + j + 2, col);
+		// Feste rechteckige Gebiets-Quadranten mit den ECHTEN Map-Farben (günstig,
+		// 4 Flächen): NW Jungle grün, NE Mithril blau, SW Goblin braun,
+		// SE Precursor grau.
+		c.fill(x, y, x + half, y + half, F_JUNGLE);
+		c.fill(x + half, y, x + SIZE, y + half, F_MITHRIL);
+		c.fill(x, y + half, x + half, y + SIZE, F_GOBLIN);
+		c.fill(x + half, y + half, x + SIZE, y + SIZE, F_PRECURSOR);
+		c.fill(x + half, y, x + half + 1, y + SIZE, 0x22FFFFFF);
+		c.fill(x, y + half, x + SIZE, y + half + 1, 0x22FFFFFF);
+		txt(c, "N", x + half - 2, y + 1, DIM, mc);
+
+		// Vorab: noch nicht gelernte Kristall-Gebiete BLASS anzeigen (Richtung
+		// schon sichtbar, ohne dass man dort gewesen sein muss).
+		Map<String, int[]> learnedM = CrystalNav.learnedView();
+		for (CrystalNav.CrystalArea ca : CrystalNav.CRYSTALS) {
+			if (ca.locations().isEmpty() || learnedM.containsKey(ca.locations().get(0))) {
+				continue;
+			}
+			int[] ap = CrystalNav.approxOf(ca.locations().get(0));
+			if (ap != null) {
+				fadedDot(c, mapX(x, ap[0]), mapZ(y, ap[2]), ca.color());
 			}
 		}
-		// Diagonalen dezent andeuten + Norden markieren.
-		txt(c, "N", x + half - 2, y + 1, DIM, mc);
-		for (Map.Entry<String, int[]> e : CrystalNav.learnedView().entrySet()) {
+		// Gelernte Punkte VOLL (in Gem-Farbe).
+		for (Map.Entry<String, int[]> e : learnedM.entrySet()) {
 			int[] p = e.getValue();
 			dot(c, mapX(x, p[0]), mapZ(y, p[2]), colorFor(e.getKey()));
 		}
 		drawPlayer(c, mapX(x, mc.player.getX()), mapZ(y, mc.player.getZ()), mc.player.getYaw());
+	}
+
+	/** Blasser Vorab-Punkt für ein noch nicht besuchtes Gebiet. */
+	private static void fadedDot(DrawContext c, int px, int py, int col) {
+		c.fill(px - 2, py - 2, px + 3, py + 3, 0x44000000);
+		c.fill(px - 1, py - 1, px + 2, py + 2, (col & 0xFFFFFF) | 0x77000000);
 	}
 
 	private static int mapX(int x, double wx) {

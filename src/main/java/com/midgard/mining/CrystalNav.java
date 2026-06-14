@@ -218,6 +218,12 @@ public final class CrystalNav {
 		return new HashMap<>(learned);
 	}
 
+	/** Ungefähre Gebiets-Position eines Ortes (für Vorab-Anzeige), sonst null. */
+	public static int[] approxOf(String name) {
+		int[] a = APPROX.get(name);
+		return a == null ? null : a.clone();
+	}
+
 	/** Ziel wählen – auch wenn der NPC noch nicht gefunden ist (Pending). Sobald
 	 *  er in der Nähe geladen wird, startet die Navigation automatisch. */
 	public static void setTarget(String name) {
