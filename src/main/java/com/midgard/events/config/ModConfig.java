@@ -37,6 +37,8 @@ public class ModConfig {
 	public boolean compactNumbers = false;
 	/** Eigene Auktions-Suche (statt Hypixel-Schild) beim Klick auf AH-Suche. */
 	public boolean auctionSearch = true;
+	/** Voller Auction-Browser (Live-Auktionen, Filter, Seiten) statt nur Schnell-Suche. */
+	public boolean auctionBrowser = true;
 	/** Verlauf der letzten Auktions-Suchen (neueste zuerst). */
 	public List<String> auctionHistory = new ArrayList<>();
 	/** Zuletzt gewählter Sterne-Filter der Auktions-Suche (0-10, rein lokal). */

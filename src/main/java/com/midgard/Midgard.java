@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15ab (Auktions-Suche: Minecraft-Stil, Sterne rechts + echtes Stern-Symbol, Hover-Stats, Vanilla-Schrift)");
+		System.out.println("[Midgard] init build=2026-06-15ac (Auction Browser: echte Live-Auktionen, echte Skins, Filter (Kategorie/Raritaet/Typ/Sort/Sterne), Seiten)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

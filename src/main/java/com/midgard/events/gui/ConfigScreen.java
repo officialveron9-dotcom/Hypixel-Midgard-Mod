@@ -360,6 +360,12 @@ public class ConfigScreen extends Screen {
 					cfg.save();
 				}));
 		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("gem"),
+				"Auction Browser", "Voller Live-Browser (echte Auktionen, Filter, Seiten) statt nur Schnell-Suche.",
+				() -> cfg.auctionBrowser, () -> {
+					cfg.auctionBrowser = !cfg.auctionBrowser;
+					cfg.save();
+				}));
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("gem"),
 				"Preise anzeigen", "Bazaar- und AH-Preise im Item-Tooltip.",
 				() -> cfg.showPrices, () -> {
 					cfg.showPrices = !cfg.showPrices;

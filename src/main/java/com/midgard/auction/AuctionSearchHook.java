@@ -59,7 +59,8 @@ public final class AuctionSearchHook {
 				// Menü selbst per Packet.
 				suppressSignSend = true;
 				try {
-					client.setScreen(new AuctionSearchScreen(sign));
+					boolean browser = Midgard.config != null && Midgard.config.auctionBrowser;
+					client.setScreen(browser ? new AuctionBrowserScreen(sign) : new AuctionSearchScreen(sign));
 				} finally {
 					suppressSignSend = false;
 				}
