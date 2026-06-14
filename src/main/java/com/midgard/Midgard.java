@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14b (Besucher nur Icons + Parser-Fix, Pfad Teleport/Fuss + Boden-Snap, Emissaer-Ziel)");
+		System.out.println("[Midgard] init build=2026-06-14c (Editor: gruener Kasten-Haken, scharfe Item-Icons fuer M/W/Reset)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

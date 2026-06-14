@@ -211,11 +211,11 @@ public class HudPositionScreen extends Screen {
 			int by = ry + (rowH - bs) / 2;
 			int rightX = x + w - 10;
 
-			// Größe-zurücksetzen-Knopf (ganz rechts).
+			// Größe-zurücksetzen-Knopf (ganz rechts) – Uhr-Icon.
 			int resetX = rightX - bs;
 			boolean rh = mouseX >= resetX && mouseX <= resetX + bs && mouseY >= by && mouseY <= by + bs;
 			sprite(context, resetX, by, bs, bs, rh ? CARD_HOVER : CARD);
-			resetIcon(context, resetX + bs / 2, by + bs / 2, rh ? TEXT : TEXT_DIM);
+			itemIcon(context, net.minecraft.item.Items.CLOCK, resetX, by, bs);
 			clickables.add(new Clickable(resetX, by, resetX + bs, by + bs, () -> {
 				cfg.setGroupScale(el.key(), 1f);
 				cfg.save();
@@ -245,16 +245,13 @@ public class HudPositionScreen extends Screen {
 					cfg.save();
 				}));
 			} else if (!global) {
-				// nur hier (Pin) / überall (Globus) – als Icon.
+				// nur hier (Karte) / überall (Ender-Auge = Welt) – echte Item-Icons.
 				boolean gl = cfg.isElementGlobal(el.key());
 				int bx = rightX - bs;
 				boolean hov = mouseX >= bx && mouseX <= bx + bs && mouseY >= by && mouseY <= by + bs;
 				sprite(context, bx, by, bs, bs, hov ? CARD_HOVER : CARD);
-				if (gl) {
-					globeIcon(context, bx + bs / 2, by + bs / 2, ACCENT);
-				} else {
-					pinIcon(context, bx + bs / 2, by + bs / 2, TEXT_DIM);
-				}
+				itemIcon(context, gl ? net.minecraft.item.Items.ENDER_EYE
+						: net.minecraft.item.Items.FILLED_MAP, bx, by, bs);
 				clickables.add(new Clickable(bx, by, bx + bs, by + bs, () -> {
 					cfg.setElementGlobal(el.key(), !cfg.isElementGlobal(el.key()));
 					cfg.save();
@@ -265,8 +262,8 @@ public class HudPositionScreen extends Screen {
 
 		// Kompakte Legende unten in der Liste.
 		String legend = global
-				? "Haken = an/aus · +/- = Anzahl · Kreis = Größe zurück · Rad = Größe"
-				: "Haken = an/aus · Pin/Globus = nur hier/überall · Kreis = Größe zurück";
+				? "Kasten = an/aus · +/- = Anzahl · Uhr = Größe zurück · Rad = Größe"
+				: "Kasten = an/aus · Karte/Auge = nur hier/überall · Uhr = Größe zurück";
 		txt(context, legend, x + 12, ry + 8, TEXT_DIM, false);
 	}
 
@@ -290,66 +287,15 @@ public class HudPositionScreen extends Screen {
 
 	// ---- Zeichen-Hilfen ---------------------------------------------------
 
-	/** Echter Haken (zwei Diagonalen) statt grünem Quadrat. */
+	/** Häkchen = grüner Kasten im Kästchen. */
 	private void check(DrawContext c, int x, int y, int size, int color) {
-		int ax = x + 2, ay = y + size / 2 + 1;
-		int bx = x + size / 2 - 1, by = y + size - 3;
-		int cx = x + size - 2, cy = y + 2;
-		seg(c, ax, ay, bx, by, color);
-		seg(c, bx, by, cx, cy, color);
+		c.fill(x + 2, y + 2, x + size - 2, y + size - 2, color);
 	}
 
-	/** Plottet eine 2px-Linie zwischen zwei Punkten. */
-	private void seg(DrawContext c, int x1, int y1, int x2, int y2, int color) {
-		int steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
-		for (int i = 0; i <= steps; i++) {
-			int px = x1 + (x2 - x1) * i / Math.max(1, steps);
-			int py = y1 + (y2 - y1) * i / Math.max(1, steps);
-			c.fill(px, py, px + 2, py + 2, color);
-		}
-	}
-
-	/** Ring (Kreis-Umriss) per plotted Punkten. */
-	private void ring(DrawContext c, int cx, int cy, int r, int color) {
-		int n = Math.max(12, r * 4);
-		for (int i = 0; i < n; i++) {
-			double a = i * (Math.PI * 2) / n;
-			int px = cx + (int) Math.round(r * Math.cos(a));
-			int py = cy + (int) Math.round(r * Math.sin(a));
-			c.fill(px, py, px + 1, py + 1, color);
-		}
-	}
-
-	/** "Nur hier" = Standort-Pin. */
-	private void pinIcon(DrawContext c, int cx, int cy, int color) {
-		ring(c, cx, cy - 2, 3, color);
-		c.fill(cx, cy - 2, cx + 1, cy - 1, color); // Punkt in der Mitte
-		seg(c, cx - 2, cy, cx, cy + 4, color); // Spitze
-		seg(c, cx + 2, cy, cx, cy + 4, color);
-	}
-
-	/** "Überall" = Globus (Ring + Meridiane). */
-	private void globeIcon(DrawContext c, int cx, int cy, int color) {
-		ring(c, cx, cy, 5, color);
-		c.fill(cx, cy - 5, cx + 1, cy + 5, color); // vertikal
-		c.fill(cx - 5, cy, cx + 5, cy + 1, color); // horizontal
-		c.fill(cx - 3, cy - 3, cx + 4, cy - 2, color); // obere Breite
-		c.fill(cx - 3, cy + 3, cx + 4, cy + 4, color); // untere Breite
-	}
-
-	/** Reset = Kreis-Pfeil. */
-	private void resetIcon(DrawContext c, int cx, int cy, int color) {
-		int r = 4;
-		int n = 20;
-		for (int i = 2; i < n; i++) { // Lücke oben rechts
-			double a = i * (Math.PI * 2) / n;
-			int px = cx + (int) Math.round(r * Math.cos(a));
-			int py = cy + (int) Math.round(r * Math.sin(a));
-			c.fill(px, py, px + 1, py + 1, color);
-		}
-		// Pfeilspitze am Anfang (oben rechts).
-		c.fill(cx + r - 1, cy - r, cx + r + 2, cy - r + 1, color);
-		c.fill(cx + r, cy - r - 1, cx + r + 1, cy - r + 2, color);
+	/** Echtes Minecraft-Item-Icon (16x16, scharf) zentriert im Kästchen. */
+	private void itemIcon(DrawContext c, net.minecraft.item.Item item, int boxX, int boxY, int boxSize) {
+		int off = (boxSize - 16) / 2;
+		c.drawItem(new net.minecraft.item.ItemStack(item), boxX + off, boxY + off);
 	}
 
 	private void outline(DrawContext c, GroupRect r, int gap, int color) {
