@@ -63,40 +63,14 @@ public final class MiningWaypoints {
 
 		boolean mobs = Midgard.config.miningGoblinWaypoints;
 		boolean comWp = Midgard.config.miningCommissionWaypoints;
-		boolean anyDone = false;
-		for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
-			if (c.done()) {
-				anyDone = true;
-				break;
-			}
-		}
 		List<Marker> out = new ArrayList<>();
 
-		// Commission-Wegpunkte je Gebiet: AKTIV -> Abbau-Gebiet, FERTIG -> der
-		// Emissär dieses Gebiets (Abgabe). Jedes Gebiet hat seinen eigenen.
-		if (comWp) {
-			for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
-				Area a = areaFor(c.name());
-				if (a == null) {
-					continue;
-				}
-				if (c.done()) {
-					out.add(new Marker(a.x(), a.y(), a.z(), c.name() + " abgeben", EMISSARY_COLOR));
-				} else {
-					out.add(new Marker(a.x(), a.y(), a.z(), c.name(), AREA_COLOR));
-				}
-			}
-		}
-
-		if (!mobs && out.isEmpty()) {
-			cached = List.of();
-			return;
-		}
-
-		// Goblins/Golems live aus den Entities (Cluster am ungefähren Spawn).
+		// Entities einmal scannen: Goblins/Golems (für Mobs) UND Emissäre (um
+		// den Commission-Wegpunkt genau auf die Emissär-Person zu legen).
 		List<double[]> goblins = new ArrayList<>();
 		List<double[]> golems = new ArrayList<>();
-		if (mobs) {
+		List<double[]> emissaries = new ArrayList<>();
+		if (mobs || comWp) {
 			int scanned = 0;
 			for (Entity e : mc.world.getEntities()) {
 				if (scanned++ > 400) {
@@ -107,16 +81,54 @@ public final class MiningWaypoints {
 				}
 				String low = e.getName().getString().toLowerCase(Locale.ROOT);
 				double[] pos = { e.getX(), e.getY(), e.getZ() };
-				if (low.contains("goblin") && !low.contains("slayer")) {
+				if (comWp && low.contains("emissary")) {
+					emissaries.add(pos);
+				} else if (mobs && low.contains("goblin") && !low.contains("slayer")) {
 					goblins.add(pos);
-				} else if (low.contains("golem") || low.contains("walker")) {
+				} else if (mobs && (low.contains("golem") || low.contains("walker"))) {
 					golems.add(pos);
 				}
 			}
 		}
+
+		// Commission-Wegpunkte: Ziel = Emissär-Person im Gebiet (wenn geladen),
+		// sonst die ungefähre Gebiets-Koordinate.
+		if (comWp) {
+			for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
+				Area a = areaFor(c.name());
+				if (a == null) {
+					continue;
+				}
+				double[] t = nearestTo(emissaries, a.x(), a.y(), a.z(), 45);
+				double tx = t != null ? t[0] : a.x();
+				double ty = t != null ? t[1] : a.y();
+				double tz = t != null ? t[2] : a.z();
+				if (c.done()) {
+					out.add(new Marker(tx, ty, tz, c.name() + " abgeben", EMISSARY_COLOR));
+				} else {
+					out.add(new Marker(tx, ty, tz, c.name(), AREA_COLOR));
+				}
+			}
+		}
+
 		cluster(goblins, "Goblins", out);
 		cluster(golems, "Golems", out);
 		cached = out;
+	}
+
+	/** Nächste Position aus {@code pts} zu (x,y,z) innerhalb {@code range} Blöcken, oder null. */
+	private static double[] nearestTo(List<double[]> pts, double x, double y, double z, double range) {
+		double[] best = null;
+		double bestD = range * range;
+		for (double[] p : pts) {
+			double dx = p[0] - x, dy = p[1] - y, dz = p[2] - z;
+			double d = dx * dx + dy * dy + dz * dz;
+			if (d <= bestD) {
+				bestD = d;
+				best = p;
+			}
+		}
+		return best;
 	}
 
 	/** Liefert die gecachte Marker-Liste (im Render-Pfad, billig). */

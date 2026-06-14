@@ -22,8 +22,8 @@ import net.minecraft.util.math.Vec3d;
  */
 public final class PathRenderer {
 
-	private static final int R = 242, G = 119, B = 47, A = 120; // Akzent-Orange, halbdurchsichtig
-	private static final int MAX_BOXES = 90;
+	private static final int R = 242, G = 119, B = 47, A = 170; // Akzent-Orange, halbdurchsichtig
+	private static final int MAX_BOXES = 160;
 
 	private static BufferAllocator allocator;
 	private static VertexConsumerProvider.Immediate immediate;
@@ -57,36 +57,72 @@ public final class PathRenderer {
 
 		VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
 		int n = path.size();
-		int step = Math.max(1, n / MAX_BOXES);
-		float h = 0.16f;
+		int step = Math.max(1, (n - 1) / MAX_BOXES);
+		// Durchgehende Linie: Schlauch-Segmente zwischen aufeinanderfolgenden Punkten.
+		Vec3d prev = null;
 		for (int i = 0; i < n; i += step) {
 			Vec3d v = path.get(i);
-			box(vc, m, v.x, v.y, v.z, h);
+			if (prev != null) {
+				tube(vc, m, prev, v, 0.09f);
+			}
+			prev = v;
+		}
+		// letztes Segment bis zum Ziel sicher anschließen
+		if (prev != null && n >= 1 && !prev.equals(path.get(n - 1))) {
+			tube(vc, m, prev, path.get(n - 1), 0.09f);
 		}
 		ms.pop();
 
 		immediate.draw();
 	}
 
-	/** Kleiner Würfel (6 Quad-Flächen) bei (cx,cy,cz). */
-	private static void box(VertexConsumer vc, Matrix4f m, double cx, double cy, double cz, float h) {
-		float x0 = (float) (cx - h), x1 = (float) (cx + h);
-		float y0 = (float) cy, y1 = (float) (cy + 2 * h);
-		float z0 = (float) (cz - h), z1 = (float) (cz + h);
-		quad(vc, m, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1); // unten
-		quad(vc, m, x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0); // oben
-		quad(vc, m, x0, y0, z0, x0, y1, z0, x1, y1, z0, x1, y0, z0); // -z
-		quad(vc, m, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1); // +z
-		quad(vc, m, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0); // -x
-		quad(vc, m, x1, y0, z0, x1, y1, z0, x1, y1, z1, x1, y0, z1); // +x
+	/** Dünner rechteckiger Schlauch von a nach b (4 Quad-Seiten) = Linie in 3D. */
+	private static void tube(VertexConsumer vc, Matrix4f m, Vec3d a, Vec3d b, float t) {
+		double dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+		double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+		if (len < 1e-4) {
+			return;
+		}
+		dx /= len;
+		dy /= len;
+		dz /= len;
+		// zwei zur Richtung senkrechte Vektoren
+		double ux = 0, uy = 1, uz = 0;
+		if (Math.abs(dy) > 0.9) {
+			ux = 1;
+			uy = 0;
+		}
+		// right = dir x up
+		double rx = dy * uz - dz * uy, ry = dz * ux - dx * uz, rz = dx * uy - dy * ux;
+		double rl = Math.sqrt(rx * rx + ry * ry + rz * rz);
+		rx = rx / rl * t;
+		ry = ry / rl * t;
+		rz = rz / rl * t;
+		// up2 = dir x right
+		double px = dy * rz - dz * ry, py = dz * rx - dx * rz, pz = dx * ry - dy * rx;
+		double pl = Math.sqrt(px * px + py * py + pz * pz);
+		px = px / pl * t;
+		py = py / pl * t;
+		pz = pz / pl * t;
+		// 4 Eckpunkte an a und b
+		float[] a1 = { (float) (a.x + rx + px), (float) (a.y + ry + py), (float) (a.z + rz + pz) };
+		float[] a2 = { (float) (a.x + rx - px), (float) (a.y + ry - py), (float) (a.z + rz - pz) };
+		float[] a3 = { (float) (a.x - rx - px), (float) (a.y - ry - py), (float) (a.z - rz - pz) };
+		float[] a4 = { (float) (a.x - rx + px), (float) (a.y - ry + py), (float) (a.z - rz + pz) };
+		float[] b1 = { (float) (b.x + rx + px), (float) (b.y + ry + py), (float) (b.z + rz + pz) };
+		float[] b2 = { (float) (b.x + rx - px), (float) (b.y + ry - py), (float) (b.z + rz - pz) };
+		float[] b3 = { (float) (b.x - rx - px), (float) (b.y - ry - py), (float) (b.z - rz - pz) };
+		float[] b4 = { (float) (b.x - rx + px), (float) (b.y - ry + py), (float) (b.z - rz + pz) };
+		quad(vc, m, a1, a2, b2, b1);
+		quad(vc, m, a2, a3, b3, b2);
+		quad(vc, m, a3, a4, b4, b3);
+		quad(vc, m, a4, a1, b1, b4);
 	}
 
-	private static void quad(VertexConsumer vc, Matrix4f m,
-			float ax, float ay, float az, float bx, float by, float bz,
-			float cx, float cy, float cz, float dx, float dy, float dz) {
-		vc.vertex(m, ax, ay, az).color(R, G, B, A);
-		vc.vertex(m, bx, by, bz).color(R, G, B, A);
-		vc.vertex(m, cx, cy, cz).color(R, G, B, A);
-		vc.vertex(m, dx, dy, dz).color(R, G, B, A);
+	private static void quad(VertexConsumer vc, Matrix4f m, float[] p1, float[] p2, float[] p3, float[] p4) {
+		vc.vertex(m, p1[0], p1[1], p1[2]).color(R, G, B, A);
+		vc.vertex(m, p2[0], p2[1], p2[2]).color(R, G, B, A);
+		vc.vertex(m, p3[0], p3[1], p3[2]).color(R, G, B, A);
+		vc.vertex(m, p4[0], p4[1], p4[2]).color(R, G, B, A);
 	}
 }

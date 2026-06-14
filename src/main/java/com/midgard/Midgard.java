@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14j (Pfad als 3D-Wuerfel in der Welt, eigener Puffer)");
+		System.out.println("[Midgard] init build=2026-06-14k (Pfad = durchgehende 3D-Linie, Ziel = Emissaer-Person, Marker-Punkt weg)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

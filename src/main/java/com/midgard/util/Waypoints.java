@@ -98,13 +98,10 @@ public final class Waypoints {
 				// Entfernungsabhängige Größe (wie Skyblocker): nah groß, fern klein.
 				float sc = (float) Math.max(0.6, Math.min(2.0, 22.0 / Math.max(4.0, dist)));
 				float fs = 8f * sc;
-				int rad = Math.max(2, Math.round(4 * sc));
 
-				marker(context, s[0], s[1], m.color(), rad);
-
-				// Zwei Zeilen OHNE Hintergrund: Name oben, Entfernung darunter.
+				// Nur Text (kein Punkt/Diamant): Name oben, Entfernung darunter.
 				int lineH = Math.round(fs) + 2;
-				int distY = s[1] - rad - 4 - lineH;
+				int distY = s[1] - lineH;
 				int nameY = distY - lineH;
 				labelLine(context, m.label(), s[0], nameY, fs, m.color());
 				labelLine(context, Math.round(dist) + "m", s[0], distY, fs, 0xFFE9E9EE);
@@ -126,22 +123,6 @@ public final class Waypoints {
 		if (!ok) {
 			c.drawText(MinecraftClient.getInstance().textRenderer, s, x, yTop, color, true);
 		}
-	}
-
-	/** Ziel-Marker: dunkel umrandeter Diamant mit hellem Kern, Radius skalierbar. */
-	private static void marker(DrawContext c, int cx, int cy, int color, int rad) {
-		int outer = rad + 1;
-		for (int i = 0; i <= outer; i++) {
-			int hw = outer - i;
-			c.fill(cx - hw, cy - i, cx + hw + 1, cy - i + 1, 0xC0000000);
-			c.fill(cx - hw, cy + i, cx + hw + 1, cy + i + 1, 0xC0000000);
-		}
-		for (int i = 0; i <= rad; i++) {
-			int hw = rad - i;
-			c.fill(cx - hw, cy - i, cx + hw + 1, cy - i + 1, color);
-			c.fill(cx - hw, cy + i, cx + hw + 1, cy + i + 1, color);
-		}
-		c.fill(cx - 1, cy - 1, cx + 1, cy + 1, 0xFFFFFFFF);
 	}
 
 	/**
