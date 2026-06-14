@@ -26,6 +26,7 @@ public final class MiningHud {
 	// als festes Mining-Element gilt und der "nur hier / überall"-Schalter greift.
 	public static final String KEY_EVENT = "MINING_EVENT_HUD";
 	public static final String KEY_POWDER = "MINING_POWDER";
+	public static final String KEY_NAV = "MINING_NAV";
 
 	private static final int GREEN = 0xFF5BE36B;
 	private static final int DIM = 0xFF9A9AA5;
@@ -116,6 +117,25 @@ public final class MiningHud {
 				rows.add(new HudRow("", "inaktiv", DIM, List.of(), false));
 			}
 			out.add(new HudGroup(KEY_EVENT, "Mining-Event", rows, Items.GUNPOWDER));
+		}
+
+		// 5) Navi-Ziel: aktuelles Navigations-Ziel (Auswahl per N-Taste).
+		if (vis(cfg, KEY_NAV, preview)) {
+			String tgt;
+			if (preview) {
+				tgt = "Crystal Nucleus";
+			} else if (CrystalNav.hasTarget()) {
+				tgt = CrystalNav.targetName();
+			} else if (MiningWaypoints.hasManual()) {
+				tgt = MiningWaypoints.manual().label();
+			} else {
+				com.midgard.util.Waypoints.Marker n = MiningWaypoints.nearest();
+				tgt = n != null ? n.label() : null;
+			}
+			List<HudRow> rows = new ArrayList<>();
+			rows.add(new HudRow("", tgt != null ? tgt : "kein Ziel (N)",
+					tgt != null ? GREEN : DIM, List.of(), false));
+			out.add(new HudGroup(KEY_NAV, "Navi", rows, Items.COMPASS));
 		}
 
 		return out;

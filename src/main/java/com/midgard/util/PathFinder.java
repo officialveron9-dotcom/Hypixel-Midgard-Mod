@@ -183,13 +183,55 @@ public final class PathFinder {
 			c = came.get(c.asLong());
 		}
 		Collections.reverse(nodes);
-		List<Vec3d> out = new ArrayList<>();
+		List<Vec3d> centered = new ArrayList<>();
 		for (BlockPos p : nodes) {
 			double[] cxz = centerXZ(world, p);
-			out.add(new Vec3d(cxz[0], p.getY() + 0.08, cxz[1]));
+			centered.add(new Vec3d(cxz[0], p.getY() + 0.08, cxz[1]));
 		}
-		smooth(out);
+		// Sichtlinien-Vereinfachung: aufeinanderfolgende Knoten zu langen geraden
+		// Abschnitten zusammenfassen, solange die Luftlinie frei bleibt (keine
+		// Wand dazwischen) und der Abschnitt nicht zu lang wird. Ergebnis hat viel
+		// weniger Stützpunkte -> die Spline-Kurve fließt glatt statt Block-für-Block.
+		return simplify(world, centered);
+	}
+
+	/** Maximale Länge eines geraden Abschnitts (Blöcke), bevor ein Stützpunkt bleibt. */
+	private static final double MAX_RUN = 6.0;
+
+	private static List<Vec3d> simplify(ClientWorld world, List<Vec3d> pts) {
+		int sz = pts.size();
+		if (sz < 3) {
+			return pts;
+		}
+		List<Vec3d> out = new ArrayList<>();
+		out.add(pts.get(0));
+		int anchor = 0;
+		for (int i = 1; i < sz - 1; i++) {
+			Vec3d a = pts.get(anchor);
+			Vec3d next = pts.get(i + 1);
+			if (a.distanceTo(next) > MAX_RUN || !clearLine(world, a, next)) {
+				out.add(pts.get(i));
+				anchor = i;
+			}
+		}
+		out.add(pts.get(sz - 1));
 		return out;
+	}
+
+	/** Freie Luftlinie zwischen a und b (jede Zelle durchquerbar)? */
+	private static boolean clearLine(ClientWorld world, Vec3d a, Vec3d b) {
+		double dist = a.distanceTo(b);
+		int steps = Math.max(1, (int) (dist / 0.5));
+		for (int s = 0; s <= steps; s++) {
+			double t = (double) s / steps;
+			double x = a.x + (b.x - a.x) * t;
+			double y = a.y + (b.y - a.y) * t;
+			double z = a.z + (b.z - a.z) * t;
+			if (!canFly(world, BlockPos.ofFloored(x, y, z))) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -232,19 +274,6 @@ public final class PathFinder {
 		return v < lo ? lo : v > hi ? hi : v;
 	}
 
-	/** Leichte Glättung (x/z) über die Nachbarn, damit die Linie ruhig fließt. */
-	private static void smooth(List<Vec3d> pts) {
-		if (pts.size() < 3) {
-			return;
-		}
-		List<Vec3d> src = new ArrayList<>(pts);
-		for (int i = 1; i < pts.size() - 1; i++) {
-			Vec3d a = src.get(i - 1), b = src.get(i), d = src.get(i + 1);
-			double nx = b.x * 0.5 + a.x * 0.25 + d.x * 0.25;
-			double nz = b.z * 0.5 + a.z * 0.25 + d.z * 0.25;
-			pts.set(i, new Vec3d(nx, b.y, nz));
-		}
-	}
 
 	private static List<Vec3d> straightFallback(BlockPos start, BlockPos goal) {
 		return List.of(

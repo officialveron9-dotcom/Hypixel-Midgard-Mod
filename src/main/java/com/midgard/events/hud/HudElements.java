@@ -41,7 +41,8 @@ public final class HudElements {
 			new Element(MiningHud.KEY_COMMISSIONS, "Commissions", Location.MINING, true),
 			new Element(MiningHud.KEY_ABILITY, "Pickaxe", Location.MINING, true),
 			new Element(MiningHud.KEY_EVENT, "Mining-Event", Location.MINING, true),
-			new Element(MiningHud.KEY_POWDER, "Powder", Location.MINING, true));
+			new Element(MiningHud.KEY_POWDER, "Powder", Location.MINING, true),
+			new Element(MiningHud.KEY_NAV, "Navi-Ziel", Location.MINING, true));
 
 	private HudElements() {
 	}

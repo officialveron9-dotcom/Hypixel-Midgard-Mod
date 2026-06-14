@@ -1,7 +1,9 @@
 package com.midgard.util;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.joml.Matrix4f;
 
@@ -68,7 +70,7 @@ public final class PathRenderer {
 			}
 		} catch (Throwable ignored) {
 		}
-		if (style < 0 || style > 4) {
+		if (style < 0 || style > 5) {
 			style = 4;
 		}
 
@@ -107,6 +109,22 @@ public final class PathRenderer {
 			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
 			for (int i = 1; i < raw.size(); i++) {
 				box(vc, m, raw.get(i), 0.11f, 200);
+			}
+		} else if (style == 5) {
+			// Leucht-Blöcke: die Bodenblöcke entlang der Route leuchten (grid-genau).
+			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
+			List<Vec3d> curve = smoothCurve(raw, SAMPLES);
+			Set<Long> seen = new HashSet<>();
+			for (Vec3d p : curve) {
+				int bx = (int) Math.floor(p.x);
+				int bz = (int) Math.floor(p.z);
+				float topY = (float) (p.y - 0.06); // Oberkante des Bodenblocks
+				int by = Math.round(topY);
+				if (!seen.add(net.minecraft.util.math.BlockPos.asLong(bx, by, bz))) {
+					continue;
+				}
+				glowTile(vc, m, bx, topY, bz, 0.03f, 60);
+				glowTile(vc, m, bx, topY + 0.002f, bz, 0.27f, 170);
 			}
 		} else {
 			List<Vec3d> curve = smoothCurve(raw, SAMPLES);
@@ -186,6 +204,15 @@ public final class PathRenderer {
 		// Format POSITION_COLOR_NORMAL_LINE_WIDTH -> exakt diese Reihenfolge.
 		vc.vertex(m, (float) a.x, (float) a.y, (float) a.z).color(R, G, B, alpha).normal(e, nx, ny, nz).lineWidth(w);
 		vc.vertex(m, (float) b.x, (float) b.y, (float) b.z).color(R, G, B, alpha).normal(e, nx, ny, nz).lineWidth(w);
+	}
+
+	/** Leuchtende Platte über einem ganzen Block (bx,bz) auf Höhe y. */
+	private static void glowTile(VertexConsumer vc, Matrix4f m, int bx, float y, int bz, float inset, int alpha) {
+		float x0 = bx + inset, x1 = bx + 1 - inset;
+		float z0 = bz + inset, z1 = bz + 1 - inset;
+		float[] p1 = { x0, y, z0 }, p2 = { x1, y, z0 }, p3 = { x1, y, z1 }, p4 = { x0, y, z1 };
+		quad(vc, m, p1, p2, p3, p4, alpha); // Oberseite
+		quad(vc, m, p4, p3, p2, p1, alpha); // Unterseite (auch von unten sichtbar)
 	}
 
 	/** Flaches, waagerechtes Band auf dem Boden (für das Boden-Glühen). */

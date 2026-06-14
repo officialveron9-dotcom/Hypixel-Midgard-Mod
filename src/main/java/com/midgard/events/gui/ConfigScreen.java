@@ -419,9 +419,10 @@ public class ConfigScreen extends Screen {
 				}));
 	}
 
-	/** Namen der Pfad-Stile (Reihenfolge = pathStyle 0..4). */
+	/** Namen der Pfad-Stile (Reihenfolge = pathStyle 0..5). */
 	private static final String[] PATH_STYLES = {
-			"Linie (Tiefe)", "Bändchen (durch Wände)", "Würfel-Spur", "Linie (durch Wände)", "Boden-Glühen" };
+			"Linie (Tiefe)", "Bändchen (durch Wände)", "Würfel-Spur", "Linie (durch Wände)",
+			"Boden-Glühen", "Leucht-Blöcke" };
 
 	private static String pathStyleName(int s) {
 		return s >= 0 && s < PATH_STYLES.length ? PATH_STYLES[s] : PATH_STYLES[0];

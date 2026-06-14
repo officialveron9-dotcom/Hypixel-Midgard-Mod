@@ -7,10 +7,15 @@ import com.midgard.mining.CrystalNav;
 import com.midgard.mining.MiningData;
 import com.midgard.mining.MiningWaypoints;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 
 /**
  * Navi-Ziel wählen. In Crystal Hollows: alle Orte (entdeckte/Nucleus anklickbar,
@@ -50,6 +55,13 @@ public class NavScreen extends Screen {
 	/** Baut die Zeilen je nach aktuellem Ort. */
 	private List<NavRow> buildRows() {
 		List<NavRow> rows = new ArrayList<>();
+		if (MiningData.INSTANCE.onMiningIsland) {
+			// Dorthin navigieren, wohin man gerade schaut (Block vor dem Fadenkreuz).
+			rows.add(new NavRow("Fadenkreuz-Ziel (wohin ich schaue)", "setzen", true, false, () -> {
+				targetLookedAt();
+				close();
+			}));
+		}
 		if (MiningData.INSTANCE.onCrystalHollows) {
 			for (String loc : CrystalNav.LOCATIONS) {
 				boolean known = CrystalNav.isLearned(loc);
@@ -77,6 +89,24 @@ public class NavScreen extends Screen {
 			}
 		}
 		return rows;
+	}
+
+	/** Setzt das manuelle Navi-Ziel auf den Block, auf den der Spieler schaut. */
+	private void targetLookedAt() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (mc.player == null) {
+			return;
+		}
+		HitResult hr = mc.player.raycast(96, 0f, false);
+		if (hr != null && hr.getType() == HitResult.Type.BLOCK) {
+			BlockPos p = ((BlockHitResult) hr).getBlockPos();
+			MiningWaypoints.setManual(p.getX() + 0.5, p.getY() + 1, p.getZ() + 0.5, "Fadenkreuz-Ziel");
+		} else {
+			// Kein Block getroffen: 30 Blöcke in Blickrichtung.
+			Vec3d eye = mc.player.getEyePos();
+			Vec3d dir = mc.player.getRotationVec(1f);
+			MiningWaypoints.setManual(eye.x + dir.x * 30, eye.y + dir.y * 30, eye.z + dir.z * 30, "Fadenkreuz-Ziel");
+		}
 	}
 
 	@Override
