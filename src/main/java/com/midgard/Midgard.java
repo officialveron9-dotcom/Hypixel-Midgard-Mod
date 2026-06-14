@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14a (Besucher-Items als Icon+Anzahl statt Text)");
+		System.out.println("[Midgard] init build=2026-06-14b (Besucher nur Icons + Parser-Fix, Pfad Teleport/Fuss + Boden-Snap, Emissaer-Ziel)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -150,7 +150,7 @@ public class Midgard implements ClientModInitializer {
 					net.minecraft.util.math.Vec3d feet = new net.minecraft.util.math.Vec3d(
 							cl.player.getX(), cl.player.getY(), cl.player.getZ());
 					com.midgard.util.Waypoints.renderPath(context, feet,
-							com.midgard.mining.MiningWaypoints.nearest(), 0xFFFFFFFF);
+							com.midgard.mining.MiningWaypoints.nearest(), 0xFFFFFFFF, !config.pathTeleport);
 				}
 			} catch (Throwable t) {
 				logOnce("Wegpunkte", t);

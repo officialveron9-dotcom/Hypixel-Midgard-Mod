@@ -69,6 +69,8 @@ public class ModConfig {
 	public boolean miningPowder = true;
 	/** Pfad-Linie über den Boden zum nächsten Wegpunkt. */
 	public boolean miningPathLine = true;
+	/** Teleport-Item vorhanden: Pfad darf über die Luft (gerade) gehen statt am Boden. */
+	public boolean pathTeleport = false;
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 

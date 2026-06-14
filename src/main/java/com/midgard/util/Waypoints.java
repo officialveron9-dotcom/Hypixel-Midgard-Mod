@@ -114,7 +114,7 @@ public final class Waypoints {
 	 * Version eines „Wegweisers" – noch KEIN Hindernis-Pathfinding (das kommt
 	 * für die Dungeons), sondern die direkte Linie über den Boden.
 	 */
-	public static void renderPath(DrawContext context, Vec3d from, Marker target, int color) {
+	public static void renderPath(DrawContext context, Vec3d from, Marker target, int color, boolean groundSnap) {
 		if (from == null || target == null) {
 			return;
 		}
@@ -127,12 +127,18 @@ public final class Waypoints {
 		if (dist < 2 || dist > 120) {
 			return; // zu nah / zu weit für eine sinnvolle Linie
 		}
+		net.minecraft.client.world.ClientWorld world = MinecraftClient.getInstance().world;
 		int steps = Math.max(2, Math.min(60, (int) (dist / 3)));
 		try {
 			for (int i = 1; i <= steps; i++) {
 				double t = i / (double) steps;
-				int[] s = p.project(from.x + (tx - from.x) * t, from.y + (ty - from.y) * t,
-						from.z + (tz - from.z) * t);
+				double wx = from.x + (tx - from.x) * t;
+				double wy = from.y + (ty - from.y) * t;
+				double wz = from.z + (tz - from.z) * t;
+				if (groundSnap && world != null) {
+					wy = groundY(world, wx, wy, wz);
+				}
+				int[] s = p.project(wx, wy + 0.1, wz);
 				if (s == null) {
 					continue;
 				}
@@ -141,6 +147,19 @@ public final class Waypoints {
 			}
 		} catch (Throwable ignored) {
 		}
+	}
+
+	/** Sucht den Boden nahe (x,y,z): vom Startniveau nach unten bis ein fester Block. */
+	private static double groundY(net.minecraft.client.world.ClientWorld world, double x, double y, double z) {
+		int bx = (int) Math.floor(x);
+		int bz = (int) Math.floor(z);
+		for (int dy = 2; dy >= -14; dy--) {
+			net.minecraft.util.math.BlockPos pos = new net.minecraft.util.math.BlockPos(bx, (int) Math.floor(y) + dy, bz);
+			if (!world.getBlockState(pos).isAir()) {
+				return pos.getY() + 1;
+			}
+		}
+		return y;
 	}
 
 	private static void diamond(DrawContext c, int cx, int cy, int color) {

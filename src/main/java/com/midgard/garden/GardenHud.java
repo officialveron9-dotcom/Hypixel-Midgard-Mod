@@ -2,8 +2,6 @@ package com.midgard.garden;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.midgard.events.config.ModConfig;
 import com.midgard.events.event.EventIcons;
@@ -72,12 +70,13 @@ public final class GardenHud {
 					if (items != null && !items.isEmpty()) {
 						List<EventHud.Badge> badges = new ArrayList<>();
 						for (String it : items) {
-							badges.add(parseBadge(it));
+							badges.add(new EventHud.Badge(itemIcon(it), "")); // nur Icon, keine Anzahl
 						}
 						rows.add(new HudRow(v + ":", "", VALUE, List.of(), false, badges));
 					} else if (preview) {
 						rows.add(new HudRow(v + ":", "", VALUE, List.of(), false,
-								List.of(new EventHud.Badge(EventIcons.forCrop("Wheat"), "32"))));
+								List.of(new EventHud.Badge(EventIcons.forCrop("Wheat"), ""),
+										new EventHud.Badge(EventIcons.forCrop("Carrot"), ""))));
 					} else {
 						rows.add(new HudRow(v + ":", "öffnen", VALUE, List.of(), false));
 					}
@@ -244,17 +243,11 @@ public final class GardenHud {
 		return out;
 	}
 
-	private static final Pattern AMOUNT = Pattern.compile("(\\d[\\d.,]*)");
-
-	/** "32x Wheat" / "Wheat x32" -> Badge(Item-Icon, "32"). */
-	private static EventHud.Badge parseBadge(String s) {
-		String count = "";
-		Matcher m = AMOUNT.matcher(s);
-		if (m.find()) {
-			count = m.group(1).replace(".", "").replace(",", "");
-		}
-		String name = s.replaceAll("(?i)\\d[\\d.,]*\\s*x?", " ").replaceAll("\\s+", " ").trim();
-		return new EventHud.Badge(EventIcons.forCrop(name), count);
+	/** Item-Icon aus einer Lore-Zeile (Anzahl/Symbole entfernt, Name fürs Icon). */
+	private static net.minecraft.item.Item itemIcon(String s) {
+		String name = s.replaceAll("(?i)\\d[\\d.,]*\\s*x?", " ").replaceAll("[^A-Za-zÄÖÜäöü ]", " ")
+				.replaceAll("\\s+", " ").trim();
+		return EventIcons.forCrop(name);
 	}
 
 	/** Bazaar-Sofortverkaufspreis des Roh-Crops (vom Backend) oder 0. */

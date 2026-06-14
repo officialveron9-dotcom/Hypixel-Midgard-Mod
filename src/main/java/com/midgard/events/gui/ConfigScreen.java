@@ -391,6 +391,11 @@ public class ConfigScreen extends Screen {
 					cfg.miningPathLine = !cfg.miningPathLine;
 					cfg.save();
 				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Teleport-Item (Weg über Luft)",
+				() -> cfg.pathTeleport, () -> {
+					cfg.pathTeleport = !cfg.pathTeleport;
+					cfg.save();
+				}));
 	}
 
 	/** Reine Info-/Hinweiszeile (nicht klickbar). */

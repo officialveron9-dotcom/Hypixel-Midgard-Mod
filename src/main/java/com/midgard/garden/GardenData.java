@@ -269,13 +269,11 @@ public class GardenData {
 		if (title.isEmpty()) {
 			return;
 		}
+		// ALLE Slots nach einem Lore-Abschnitt "Required"/"Benötigt" durchsuchen
+		// (egal welches Item) – robuster als nur das "Accept Offer"-Item.
 		for (Slot slot : hs.getScreenHandler().slots) {
 			ItemStack st = slot.getStack();
 			if (st == null || st.isEmpty()) {
-				continue;
-			}
-			String name = st.getName() == null ? "" : st.getName().getString();
-			if (!name.toLowerCase(Locale.ROOT).contains("accept offer")) {
 				continue;
 			}
 			LoreComponent lore = st.get(DataComponentTypes.LORE);
@@ -287,15 +285,23 @@ public class GardenData {
 			for (Text line : lore.lines()) {
 				String l = ScoreboardReader.stripFormatting(line.getString());
 				String low = l.toLowerCase(Locale.ROOT);
-				if (low.startsWith("required") || low.startsWith("benötigt")) {
+				if (low.contains("required") || low.contains("benötigt")) {
 					inReq = true;
+					// Manche Formate listen das erste Item in derselben Zeile.
+					String after = l.replaceAll("(?i).*required:?|.*benötigt:?", "").trim();
+					if (looksLikeItem(after)) {
+						needed.add(after);
+					}
 					continue;
 				}
 				if (inReq) {
-					if (l.isEmpty() || low.startsWith("reward") || low.startsWith("belohnung")) {
+					if (l.isEmpty() || low.contains("reward") || low.contains("belohnung")
+							|| low.contains("click") || low.contains("klick")) {
 						break;
 					}
-					needed.add(l.trim());
+					if (looksLikeItem(l)) {
+						needed.add(l.trim());
+					}
 				}
 			}
 			if (!needed.isEmpty()) {
@@ -304,9 +310,22 @@ public class GardenData {
 				visitorItems = copy;
 				lastVisitorScreenHash = s.hashCode();
 				System.out.println("[Midgard] Besucher '" + title + "' will: " + needed);
+				return;
 			}
-			break;
 		}
+	}
+
+	/** Grobe Heuristik: enthält Buchstaben (Item-Name), keine reine Beschreibung. */
+	private static boolean looksLikeItem(String s) {
+		if (s == null || s.length() < 2) {
+			return false;
+		}
+		String low = s.toLowerCase(Locale.ROOT);
+		if (low.startsWith("offer") || low.startsWith("you ") || low.startsWith("accept")
+				|| low.contains("garden exp") || low.contains("copper")) {
+			return false;
+		}
+		return s.matches(".*[A-Za-zÄÖÜäöü].*");
 	}
 
 	private static final Pattern PEST_CHAT = Pattern.compile(

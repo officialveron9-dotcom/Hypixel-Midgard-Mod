@@ -86,7 +86,11 @@ public final class MiningWaypoints {
 		return cached;
 	}
 
-	/** Der dem Spieler nächste Marker (für die Pfad-Linie) oder null. */
+	/**
+	 * Der dem Spieler nächste Marker (für die Pfad-Linie) oder null. Sind
+	 * Emissäre dabei (= eine Commission ist fertig), wird der NÄCHSTE EMISSÄR
+	 * bevorzugt – damit der Weg zur Abgabe gezeigt wird.
+	 */
 	public static Marker nearest() {
 		List<Marker> list = cached;
 		MinecraftClient mc = MinecraftClient.getInstance();
@@ -94,9 +98,19 @@ public final class MiningWaypoints {
 			return null;
 		}
 		double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
+		boolean hasEmissary = false;
+		for (Marker m : list) {
+			if (m.color() == EMISSARY_COLOR) {
+				hasEmissary = true;
+				break;
+			}
+		}
 		Marker best = null;
 		double bestD = Double.MAX_VALUE;
 		for (Marker m : list) {
+			if (hasEmissary && m.color() != EMISSARY_COLOR) {
+				continue; // bei fertiger Commission nur Emissäre als Ziel
+			}
 			double dx = m.x() - px, dy = m.y() - py, dz = m.z() - pz;
 			double d = dx * dx + dy * dy + dz * dz;
 			if (d < bestD) {
