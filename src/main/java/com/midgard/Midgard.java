@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14d (XP-Zahl + Item-Name nicht mehr doppelt, Pfad als verbundene Linie)");
+		System.out.println("[Midgard] init build=2026-06-14e (In-World-Pfad 3D + A*-Wegfindung um Waende/Barrieren)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -74,6 +74,17 @@ public class Midgard implements ClientModInitializer {
 		// Abgebaute Blöcke an den Farming-Tracker melden (Blöcke/s + Crop-Erkennung).
 		net.fabricmc.fabric.api.event.client.player.ClientPlayerBlockBreakEvents.AFTER.register(
 				(world, player, pos, state) -> com.midgard.garden.FarmingTracker.INSTANCE.onBlockBroken(state));
+
+		// Pfad-Linie ECHT in der Welt zeichnen (3D), nach den Entities.
+		net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents.AFTER_ENTITIES.register(ctx -> {
+			try {
+				if (config != null && config.miningPathLine) {
+					com.midgard.util.PathRenderer.render(ctx);
+				}
+			} catch (Throwable t) {
+				logOnce("Pfad3D", t);
+			}
+		});
 
 		// Chat-Nachrichten an den Live-Event-Tracker weitergeben (nur lesen, nie senden).
 		ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
@@ -125,6 +136,17 @@ public class Midgard implements ClientModInitializer {
 				com.midgard.garden.GardenData.INSTANCE.update(client);
 				com.midgard.mining.MiningData.INSTANCE.update(client);
 				com.midgard.mining.MiningWaypoints.tick(client);
+				// Wegfinder zum nächsten Ziel aktualisieren (oder löschen).
+				if (config.miningPathLine) {
+					com.midgard.util.Waypoints.Marker tgt = com.midgard.mining.MiningWaypoints.nearest();
+					if (tgt != null) {
+						com.midgard.util.PathFinder.update(tgt.x(), tgt.y(), tgt.z(), config.pathTeleport);
+					} else {
+						com.midgard.util.PathFinder.clear();
+					}
+				} else {
+					com.midgard.util.PathFinder.clear();
+				}
 				com.midgard.events.event.JacobWarner.INSTANCE.tick(client);
 				com.midgard.price.PriceApi.INSTANCE.maybeRefresh();
 			}
@@ -145,13 +167,6 @@ public class Midgard implements ClientModInitializer {
 			}
 			try {
 				com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
-				net.minecraft.client.MinecraftClient cl = net.minecraft.client.MinecraftClient.getInstance();
-				if (config != null && config.miningPathLine && cl.player != null) {
-					net.minecraft.util.math.Vec3d feet = new net.minecraft.util.math.Vec3d(
-							cl.player.getX(), cl.player.getY(), cl.player.getZ());
-					com.midgard.util.Waypoints.renderPath(context, feet,
-							com.midgard.mining.MiningWaypoints.nearest(), 0xFFFFFFFF, !config.pathTeleport);
-				}
 			} catch (Throwable t) {
 				logOnce("Wegpunkte", t);
 			}
