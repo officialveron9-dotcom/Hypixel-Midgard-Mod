@@ -403,6 +403,11 @@ public class ConfigScreen extends Screen {
 	}
 
 	private void buildDebugRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Pfad-Linie hinter Wänden ausblenden",
+				() -> cfg.pathHideBehindWalls, () -> {
+					cfg.pathHideBehindWalls = !cfg.pathHideBehindWalls;
+					cfg.save();
+				}));
 		out.add(infoRow(context, cardX, "Taste M = nahe NPCs/Entities (Name · Typ · ID · Position) in den Chat."));
 		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Debug aktiv (In-Welt-Labels erlauben)",
 				() -> cfg.debugEnabled, () -> {

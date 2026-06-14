@@ -35,7 +35,7 @@ public final class PathRenderer {
 	private static final int R = 245, G = 130, B = 50; // Akzent-Orange
 	private static final int ALPHA = 220;
 	private static final double START_AHEAD = 1.3; // Blöcke vor dem Spieler beginnen
-	private static final double MAX_RENDER = 80.0; // nur so weit nach vorn zeichnen (FPS + Relevanz)
+	private static final double MAX_RENDER = 60.0; // nur so weit nach vorn zeichnen (FPS + Relevanz)
 
 	private static BufferAllocator allocator;
 	private static VertexConsumerProvider.Immediate immediate;
@@ -74,6 +74,7 @@ public final class PathRenderer {
 
 		VertexConsumer vc = fillVc();
 		net.minecraft.world.World w = mc.world;
+		boolean hideBehind = com.midgard.Midgard.config == null || com.midgard.Midgard.config.pathHideBehindWalls;
 		double rendered = 0;
 		outer:
 		for (int i = 0; i + 1 < rp.size(); i++) {
@@ -90,10 +91,15 @@ public final class PathRenderer {
 				Vec3d p0 = lerp(a, b, (double) k / steps);
 				Vec3d p1 = lerp(a, b, (double) (k + 1) / steps);
 				rendered += p0.distanceTo(p1);
-				// Stück, das in einem soliden Block steckt, NICHT zeichnen -> die
-				// Linie kann nie sichtbar durch eine Wand gehen (unabhängig vom
-				// Tiefentest). Nur freie Luft wird gezeichnet.
-				if (isSolid(w, lerp(p0, p1, 0.5))) {
+				Vec3d mid = lerp(p0, p1, 0.5);
+				// 1) Stück IM Block -> nie zeichnen (steckt in der Wand).
+				if (isSolid(w, mid)) {
+					continue;
+				}
+				// 2) Stück HINTER einer Wand (von der Kamera aus) -> nicht zeichnen.
+				// CPU-Sichtprüfung statt GPU-Tiefentest -> die Linie geht NIE sichtbar
+				// durch eine Wand, egal was die Render-Pipeline macht.
+				if (hideBehind && occluded(w, cam, mid, mc.player)) {
 					continue;
 				}
 				tube(vc, m, p0, p1, 0.085f, 0.05f, ALPHA);
@@ -108,6 +114,19 @@ public final class PathRenderer {
 	private static boolean isSolid(net.minecraft.world.World w, Vec3d p) {
 		net.minecraft.util.math.BlockPos bp = net.minecraft.util.math.BlockPos.ofFloored(p.x, p.y, p.z);
 		return !w.getBlockState(bp).getCollisionShape(w, bp).isEmpty();
+	}
+
+	/** Liegt zwischen Kamera und Punkt eine solide Wand? (eigener „Tiefentest"). */
+	private static boolean occluded(net.minecraft.world.World w, Vec3d cam, Vec3d point,
+			net.minecraft.entity.Entity player) {
+		net.minecraft.util.hit.BlockHitResult hit = w.raycast(new net.minecraft.world.RaycastContext(
+				cam, point, net.minecraft.world.RaycastContext.ShapeType.COLLIDER,
+				net.minecraft.world.RaycastContext.FluidHandling.NONE, player));
+		if (hit.getType() != net.minecraft.util.hit.HitResult.Type.BLOCK) {
+			return false; // freie Sicht
+		}
+		// Wand deutlich VOR dem Punkt getroffen -> verdeckt.
+		return cam.squaredDistanceTo(hit.getPos()) < cam.squaredDistanceTo(point) - 0.25;
 	}
 
 	/**

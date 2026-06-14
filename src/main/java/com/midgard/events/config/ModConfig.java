@@ -75,6 +75,9 @@ public class ModConfig {
 	/** Mini-Karte in Crystal Hollows (Mitte/Jungle fest, Spieler + gelernte Punkte). */
 	public boolean chMinimap = true;
 
+	/** Pfad-Linie hinter Wänden ausblenden (CPU-Sichtprüfung, statt GPU-Tiefentest). */
+	public boolean pathHideBehindWalls = true;
+
 	// --- Debug ---------------------------------------------------------------
 	/** Debug-Abteilung aktiv (M-Taste dumpt Entities in den Chat). */
 	public boolean debugEnabled = false;
