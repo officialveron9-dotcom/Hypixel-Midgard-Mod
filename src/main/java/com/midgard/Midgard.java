@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15g (Marker-Text via ctx.consumers, ungefaehres NPC-Ziel, Biom-Label unter Karte, Minimap verschiebbar)");
+		System.out.println("[Midgard] init build=2026-06-15h (EIN Pfad Boden+Luft-Mix, Marker zurueck auf 2D-Text, kein Slider)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -84,13 +84,6 @@ public class Midgard implements ClientModInitializer {
 				}
 			} catch (Throwable t) {
 				logOnce("Pfad3D", t);
-			}
-			// Wegpunkt-Marker als 3D-Billboards in der Welt (kein Wackeln beim
-			// Springen/Ducken – die Kamera-Matrix erledigt das korrekt).
-			try {
-				com.midgard.util.WorldMarkers.render(ctx, com.midgard.mining.MiningWaypoints.markers());
-			} catch (Throwable t) {
-				logOnce("Marker3D", t);
 			}
 		});
 
@@ -178,14 +171,14 @@ public class Midgard implements ClientModInitializer {
 					if (com.midgard.mining.CrystalNav.hasTarget()) {
 						double[] nav = com.midgard.mining.CrystalNav.target();
 						if (nav != null) {
-							com.midgard.util.PathFinder.update(nav[0], nav[1], nav[2], config.pathTeleport);
+							com.midgard.util.PathFinder.update(nav[0], nav[1], nav[2]);
 						} else {
 							com.midgard.util.PathFinder.clear(); // gewählt, aber noch in Suche
 						}
 					} else {
 						com.midgard.util.Waypoints.Marker tgt = com.midgard.mining.MiningWaypoints.nearest();
 						if (tgt != null) {
-							com.midgard.util.PathFinder.update(tgt.x(), tgt.y(), tgt.z(), config.pathTeleport);
+							com.midgard.util.PathFinder.update(tgt.x(), tgt.y(), tgt.z());
 						} else {
 							com.midgard.util.PathFinder.clear();
 						}
@@ -221,6 +214,13 @@ public class Midgard implements ClientModInitializer {
 					com.midgard.events.hud.MinimapHud.INSTANCE.render(context);
 				} catch (Throwable t) {
 					logOnce("Minimap", t);
+				}
+				// Wegpunkt-Marker (Name + Entfernung) als 2D-Labels – die zeigen
+				// zuverlässig Text an (3D-Text rendert in dieser MC-Version nicht).
+				try {
+					com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
+				} catch (Throwable t) {
+					logOnce("Wegpunkte", t);
 				}
 			}
 			try {

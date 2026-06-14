@@ -102,7 +102,6 @@ public final class NaviHud {
 
 		int rowH = 11;
 		int headH = 13;
-		int sliderH = 16;
 		int pad = 5;
 		int w = 120;
 		// Breite an den längsten Eintrag anpassen (nur Name, kein Tag).
@@ -110,7 +109,7 @@ public final class NaviHud {
 			w = Math.max(w, txtW(en.label(), mc) + pad * 2 + 4);
 		}
 		w = Math.min(w, 190);
-		int h = headH + sliderH + entries.size() * rowH + pad;
+		int h = headH + entries.size() * rowH + pad;
 		int x = cfg.hasGroupPos(MiningHud.KEY_NAV) ? cfg.groupX(MiningHud.KEY_NAV) : sw - w - 6;
 		int y = cfg.hasGroupPos(MiningHud.KEY_NAV) ? cfg.groupY(MiningHud.KEY_NAV) : Math.max(40, sh / 2 - h / 2);
 		x = Math.max(2, Math.min(x, sw - w - 2));
@@ -124,21 +123,7 @@ public final class NaviHud {
 		double my = mc.mouse.getY() * (double) sh / mc.getWindow().getHeight();
 		boolean cursor = mc.currentScreen != null; // Chat o.ä. offen -> Mauszeiger
 
-		// Schiebe-Slider: Pfad am Boden (links) oder durch die Luft (rechts).
-		boolean air = cfg.pathTeleport;
-		int trackX = x + pad, trackY = y + headH + 1, trackW = w - pad * 2, trackH = 12;
-		int half = trackW / 2;
-		UIRenderer.fillRoundedRect(c, trackX, trackY, trackW, trackH, 3, 0x77202028);
-		int knobX = air ? trackX + trackW - half : trackX;
-		UIRenderer.fillRoundedRect(c, knobX, trackY, half, trackH, 3, ACCENT);
-		txt(c, "Boden", trackX + (half - txtW("Boden", mc)) / 2, trackY + 3, air ? DIM : 0xFF15151A, false, mc);
-		txt(c, "Luft", trackX + half + (half - txtW("Luft", mc)) / 2, trackY + 3, air ? 0xFF15151A : DIM, false, mc);
-		rects.add(new Rect(trackX, trackY, trackX + trackW, trackY + trackH, () -> {
-			cfg.pathTeleport = !cfg.pathTeleport;
-			cfg.save();
-		}));
-
-		int ry = y + headH + sliderH;
+		int ry = y + headH;
 		for (Entry en : entries) {
 			boolean hover = cursor && en.clickable() && mx >= x + 2 && mx <= x + w - 2 && my >= ry && my <= ry + rowH;
 			if (hover) {

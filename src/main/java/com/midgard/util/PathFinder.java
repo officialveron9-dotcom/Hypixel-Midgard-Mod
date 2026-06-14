@@ -47,11 +47,11 @@ public final class PathFinder {
 	}
 
 	/**
-	 * Aktualisiert den Pfad zum Ziel. {@code flying} = Teleport-/Flug-Item
-	 * vorhanden: der Weg darf senkrecht durch Löcher/Decken gehen (kein fester
-	 * Boden nötig), aber NIE durch solide Wände. Sonst normale Boden-Wegfindung.
+	 * Aktualisiert den Pfad zum Ziel. EIN vereinheitlichter Weg: bevorzugt den
+	 * BODEN (günstig), darf aber bei Bedarf über die LUFT gehen (Aufschlag) –
+	 * z. B. eine Wand hoch oder über eine Lücke –, NIE durch solide Blöcke.
 	 */
-	public static void update(double gx, double gy, double gz, boolean flying) {
+	public static void update(double gx, double gy, double gz) {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if (mc.player == null || mc.world == null) {
 			clear();
@@ -73,7 +73,7 @@ public final class PathFinder {
 		lastCalcMs = now;
 
 		try {
-			path = astar(mc.world, start, goal, flying);
+			path = astar(mc.world, start, goal);
 		} catch (Throwable t) {
 			path = List.of();
 		}
@@ -84,18 +84,27 @@ public final class PathFinder {
 	private record Node(BlockPos pos, double g, double f) {
 	}
 
-	private static List<Vec3d> astar(ClientWorld world, BlockPos start, BlockPos goal, boolean flying) {
+	/** Luft-Schritte kosten mehr -> der Pfad bevorzugt den Boden, fliegt nur wenn nötig. */
+	private static final double AIR_PENALTY = 2.6;
+
+	private static List<Vec3d> astar(ClientWorld world, BlockPos start, BlockPos goal) {
 		if (start.getManhattanDistance(goal) > 600) {
 			return straightFallback(start, goal);
 		}
-		// Boden-Modus: liegt der Spieler in der Luft (Springen/Fliegen), den BODEN
-		// DARUNTER als Start nehmen -> der Pfad wird trotzdem (am Boden) angezeigt.
-		BlockPos s = flying ? nearestPassable(world, start) : standableStart(world, start);
+		// Start: Boden unter dem Spieler (auch wenn er springt/fliegt), sonst eine
+		// freie Zelle (Luft).
+		BlockPos s = standableStart(world, start);
+		if (s == null) {
+			s = nearestPassable(world, start);
+		}
 		if (s == null) {
 			return straightFallback(start, goal);
 		}
-		// Erreichbares Ziel finden; sonst Richtung Roh-Ziel (Teilweg).
-		BlockPos gs = flying ? nearestPassable(world, goal) : nearestStandable(world, goal);
+		// Ziel: begehbarer Block, sonst freie Zelle, sonst Roh-Ziel (Teilweg).
+		BlockPos gs = nearestStandable(world, goal);
+		if (gs == null) {
+			gs = nearestPassable(world, goal);
+		}
 		BlockPos target = gs != null ? gs : goal;
 
 		PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Double.compare(a.f, b.f));
@@ -128,13 +137,14 @@ public final class PathFinder {
 						if (dx == 0 && dy == 0 && dz == 0) {
 							continue;
 						}
-						// Laufen: keine reinen Vertikal-Schritte (Boden nötig).
-						if (!flying && dx == 0 && dz == 0) {
+						BlockPos np = cp.add(dx, dy, dz);
+						boolean ground = canStand(world, np); // fester Boden drunter
+						boolean air = !ground && canFly(world, np); // nur frei (Luft)
+						if (!ground && !air) {
 							continue;
 						}
-						BlockPos np = cp.add(dx, dy, dz);
-						boolean ok = flying ? canFly(world, np) : canStand(world, np);
-						if (!ok) {
+						// Reine Vertikal-Schritte (Wand hoch/runter, Loch) nur über Luft.
+						if (dx == 0 && dz == 0 && !air) {
 							continue;
 						}
 						// Keine Diagonale durch Block-Ecken (waagerecht).
@@ -143,14 +153,15 @@ public final class PathFinder {
 								continue;
 							}
 						}
-						// Flug: senkrechte Diagonale nicht durch die Decke/Boden-Ecke.
-						if (flying && dy != 0 && (dx != 0 || dz != 0)) {
+						// Luft + senkrechte Diagonale: nicht durch die Decke/Boden-Ecke.
+						if (air && dy != 0 && (dx != 0 || dz != 0)) {
 							if (!passable(world, cp.add(0, dy, 0)) || !passable(world, cp.add(0, dy, 0).up())) {
 								continue;
 							}
 						}
-						double step = flying ? Math.sqrt(dx * dx + dy * dy + dz * dz)
-								: Math.sqrt(dx * dx + dz * dz) + (dy != 0 ? 0.5 : 0);
+						// Boden günstig, Luft teurer -> Boden wird bevorzugt.
+						double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+						double step = ground ? dist : dist * AIR_PENALTY;
 						double ng = cur.g + step;
 						long key = np.asLong();
 						Double old = best.get(key);
