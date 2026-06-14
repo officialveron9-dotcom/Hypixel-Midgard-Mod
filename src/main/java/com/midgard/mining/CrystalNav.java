@@ -156,6 +156,11 @@ public final class CrystalNav {
 		return learned.containsKey(name);
 	}
 
+	/** Kopie der gelernten Punkte (Name -> {x,y,z}) für die Mini-Karte. */
+	public static Map<String, int[]> learnedView() {
+		return new HashMap<>(learned);
+	}
+
 	/** Ziel wählen – auch wenn der NPC noch nicht gefunden ist (Pending). Sobald
 	 *  er in der Nähe geladen wird, startet die Navigation automatisch. */
 	public static void setTarget(String name) {

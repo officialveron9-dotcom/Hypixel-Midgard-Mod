@@ -72,6 +72,8 @@ public class ModConfig {
 	public boolean miningPathLine = true;
 	/** Teleport-Item vorhanden: Pfad darf über die Luft (gerade) gehen statt am Boden. */
 	public boolean pathTeleport = false;
+	/** Mini-Karte in Crystal Hollows (Mitte/Jungle fest, Spieler + gelernte Punkte). */
+	public boolean chMinimap = true;
 	/** Gelernte Emissär-Positionen je Gebiets-Stichwort ([x,y,z]) – einmal gesehen, dauerhaft gemerkt. */
 	public Map<String, List<Integer>> learnedEmissary = new HashMap<>();
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */

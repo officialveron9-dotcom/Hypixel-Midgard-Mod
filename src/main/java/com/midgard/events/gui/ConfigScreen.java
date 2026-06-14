@@ -396,6 +396,11 @@ public class ConfigScreen extends Screen {
 					cfg.pathTeleport = !cfg.pathTeleport;
 					cfg.save();
 				}));
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Mini-Karte (Crystal Hollows)",
+				() -> cfg.chMinimap, () -> {
+					cfg.chMinimap = !cfg.chMinimap;
+					cfg.save();
+				}));
 	}
 
 	/** Reine Info-/Hinweiszeile (nicht klickbar). */

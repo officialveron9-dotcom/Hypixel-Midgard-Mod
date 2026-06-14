@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15a (Tiefe aus Snippet, gerader, CH-Navi=Amber-Test+Pending, Navi nur Name, Editor-Feinschliff)");
+		System.out.println("[Midgard] init build=2026-06-15b (3D-Marker statt 2D, Editor-Trennlinie+Zurueck unten, CH-Minimap)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -84,6 +84,13 @@ public class Midgard implements ClientModInitializer {
 				}
 			} catch (Throwable t) {
 				logOnce("Pfad3D", t);
+			}
+			// Wegpunkt-Marker als 3D-Billboards in der Welt (kein Wackeln beim
+			// Springen/Ducken – die Kamera-Matrix erledigt das korrekt).
+			try {
+				com.midgard.util.WorldMarkers.render(ctx, com.midgard.mining.MiningWaypoints.markers());
+			} catch (Throwable t) {
+				logOnce("Marker3D", t);
 			}
 		});
 
@@ -202,17 +209,18 @@ public class Midgard implements ClientModInitializer {
 				} catch (Throwable t) {
 					logOnce("NaviHud", t);
 				}
+				try {
+					com.midgard.events.hud.MinimapHud.INSTANCE.render(context);
+				} catch (Throwable t) {
+					logOnce("Minimap", t);
+				}
 			}
 			try {
 				com.midgard.bars.StatusBars.render(context);
 			} catch (Throwable t) {
 				logOnce("Bars", t);
 			}
-			try {
-				com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
-			} catch (Throwable t) {
-				logOnce("Wegpunkte", t);
-			}
+			// (Wegpunkt-Marker werden jetzt in 3D gezeichnet, siehe WorldMarkers.)
 		});
 	}
 }

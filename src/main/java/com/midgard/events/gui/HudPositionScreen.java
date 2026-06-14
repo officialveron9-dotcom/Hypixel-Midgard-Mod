@@ -56,6 +56,8 @@ public class HudPositionScreen extends Screen {
 	private String selected = null;
 	private boolean dragging = false;
 	private int dragOffsetX, dragOffsetY;
+	/** Rechteck der Element-Liste (für den Zurück-Knopf direkt darunter). */
+	private int panelX, panelY, panelW, panelH;
 
 	public HudPositionScreen(Screen parent) {
 		super(Text.literal("HUD bearbeiten"));
@@ -179,6 +181,10 @@ public class HudPositionScreen extends Screen {
 		int h = headH + els.size() * rowH + legendH;
 		int x = (this.width - w) / 2;
 		int y = (this.height - h) / 2;
+		panelX = x;
+		panelY = y;
+		panelW = w;
+		panelH = h;
 
 		sprite(context, x - 1, y - 1, w + 2, h + 2, BORDER);
 		sprite(context, x, y, w, h, PANEL);
@@ -260,9 +266,11 @@ public class HudPositionScreen extends Screen {
 			ry += rowH;
 		}
 
+		// Trennlinie, damit die Legende nicht wie eine Einstellung aussieht.
+		context.fill(x + 10, ry + 3, x + w - 10, ry + 4, 0x33FFFFFF);
 		// Legende mit echten Icons (zeigt, was die Symbole bedeuten).
 		int lx = x + 12;
-		int lty = ry + 9;
+		int lty = ry + 10;
 		lx = legendBox(context, lx, lty, ON, "an/aus");
 		if (!global) {
 			lx = legendIcon(context, lx, lty, net.minecraft.item.Items.FILLED_MAP, "nur hier");
@@ -299,9 +307,10 @@ public class HudPositionScreen extends Screen {
 	}
 
 	private void drawBack(DrawContext context, int mouseX, int mouseY) {
-		int w = 90, h = 20;
-		int x = 12;
-		int y = 12; // oben links, nicht mehr ganz unten
+		int w = 100, h = 20;
+		// Direkt unter die Element-Liste; in der Standortauswahl mittig unten.
+		int x = activeLoc != null ? panelX + (panelW - w) / 2 : (this.width - w) / 2;
+		int y = activeLoc != null ? panelY + panelH + 8 : this.height / 2 + 90;
 		boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
 		sprite(context, x - 1, y - 1, w + 2, h + 2, BORDER);
 		sprite(context, x, y, w, h, hover ? 0xFFFF8A45 : ACCENT);
