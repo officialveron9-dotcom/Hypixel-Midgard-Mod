@@ -73,19 +73,22 @@ public final class PathRenderer {
 			style = 4;
 		}
 
-		// Nur den noch offenen Rest zeichnen: ab dem Knoten, der dem Spieler am
-		// nächsten ist (Linie schrumpft hinter einem, statt zu springen).
+		// Nur den noch offenen Rest zeichnen: ab dem horizontal nächsten Knoten.
+		// Den Startpunkt auf die BODENHÖHE dieses Knotens legen – so bleibt die
+		// Linie am Boden, auch wenn man springt/fliegt (geht nicht in die Luft).
 		int n = path.size();
-		Vec3d feet = new Vec3d(mc.player.getX(), mc.player.getY() + 0.1, mc.player.getZ());
+		double px = mc.player.getX(), pz = mc.player.getZ();
 		int startIdx = 0;
 		double bestD = Double.MAX_VALUE;
 		for (int i = 0; i < n; i++) {
-			double d = path.get(i).squaredDistanceTo(feet);
+			double dx = path.get(i).x - px, dz = path.get(i).z - pz;
+			double d = dx * dx + dz * dz;
 			if (d < bestD) {
 				bestD = d;
 				startIdx = i;
 			}
 		}
+		Vec3d feet = new Vec3d(px, path.get(startIdx).y, pz);
 
 		// Rohpunkte (Füße + restliche Knoten, ggf. ausgedünnt) -> Spline.
 		int step = Math.max(1, (n - startIdx) / MAX_SEG);
@@ -112,20 +115,19 @@ public final class PathRenderer {
 				box(vc, m, raw.get(i), 0.11f, 200);
 			}
 		} else if (style == 5) {
-			// Leucht-Blöcke: der ECHTE Bodenblock (auf dem man läuft) glüht als
-			// Ganzes – kein schwebendes Extra-Element, sondern der Block selbst.
-			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
+			// Leucht-Blöcke: leuchtender Rahmen um den ECHTEN Bodenblock, TIEFEN-
+			// getestet (hugt die Blockkanten, wird vom Terrain verdeckt) -> wirkt in
+			// der Welt statt wie auf den Bildschirm geklebt. Kein Extra-Teil.
+			VertexConsumer frame = immediate.getBuffer(RenderLayers.LINES);
 			Set<Long> seen = new HashSet<>();
 			for (Vec3d p : densify(raw, 0.4)) {
 				int bx = (int) Math.floor(p.x);
 				int bz = (int) Math.floor(p.z);
-				int feetY = (int) Math.floor(p.y - 0.08);
-				int floorY = feetY - 1; // der feste Block unter den Füßen
+				int floorY = (int) Math.floor(p.y - 0.08) - 1; // fester Block unter den Füßen
 				if (!seen.add(net.minecraft.util.math.BlockPos.asLong(bx, floorY, bz))) {
 					continue;
 				}
-				Vec3d c = new Vec3d(bx + 0.5, floorY + 0.5, bz + 0.5);
-				box(vc, m, c, 0.5f - 0.03f, 80); // ganzer Block, leicht durchscheinend -> glüht
+				blockFrame(frame, entry, m, bx, floorY, bz, 3.5f);
 			}
 		} else if (style == 0) {
 			// Tiefengetestete Linie – von Blöcken verdeckt.
@@ -189,6 +191,33 @@ public final class PathRenderer {
 		// Format POSITION_COLOR_NORMAL_LINE_WIDTH -> exakt diese Reihenfolge.
 		vc.vertex(m, (float) a.x, (float) a.y, (float) a.z).color(R, G, B, alpha).normal(e, nx, ny, nz).lineWidth(w);
 		vc.vertex(m, (float) b.x, (float) b.y, (float) b.z).color(R, G, B, alpha).normal(e, nx, ny, nz).lineWidth(w);
+	}
+
+	/** Leuchtender Rahmen um einen ganzen Block (12 Kanten, tiefengetestet). */
+	private static void blockFrame(VertexConsumer vc, MatrixStack.Entry e, Matrix4f m, int bx, int by, int bz, float w) {
+		float o = 0.004f; // minimal außerhalb -> kein Z-Fighting mit der Blockfläche
+		double x0 = bx - o, x1 = bx + 1 + o;
+		double y0 = by - o, y1 = by + 1 + o;
+		double z0 = bz - o, z1 = bz + 1 + o;
+		Vec3d c000 = new Vec3d(x0, y0, z0), c100 = new Vec3d(x1, y0, z0);
+		Vec3d c101 = new Vec3d(x1, y0, z1), c001 = new Vec3d(x0, y0, z1);
+		Vec3d c010 = new Vec3d(x0, y1, z0), c110 = new Vec3d(x1, y1, z0);
+		Vec3d c111 = new Vec3d(x1, y1, z1), c011 = new Vec3d(x0, y1, z1);
+		// untere Kante
+		line(vc, e, m, c000, c100, w, 255);
+		line(vc, e, m, c100, c101, w, 255);
+		line(vc, e, m, c101, c001, w, 255);
+		line(vc, e, m, c001, c000, w, 255);
+		// obere Kante
+		line(vc, e, m, c010, c110, w, 255);
+		line(vc, e, m, c110, c111, w, 255);
+		line(vc, e, m, c111, c011, w, 255);
+		line(vc, e, m, c011, c010, w, 255);
+		// senkrechte Kanten
+		line(vc, e, m, c000, c010, w, 255);
+		line(vc, e, m, c100, c110, w, 255);
+		line(vc, e, m, c101, c111, w, 255);
+		line(vc, e, m, c001, c011, w, 255);
 	}
 
 	/** Flaches, waagerechtes Band auf dem Boden (für das Boden-Glühen). */

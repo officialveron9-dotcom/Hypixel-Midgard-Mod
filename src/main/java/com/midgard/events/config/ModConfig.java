@@ -72,8 +72,8 @@ public class ModConfig {
 	public boolean miningPathLine = true;
 	/** Teleport-Item vorhanden: Pfad darf über die Luft (gerade) gehen statt am Boden. */
 	public boolean pathTeleport = false;
-	/** Pfad-Stil: 0=Linie (Tiefe), 1=Bändchen, 2=Würfel, 3=Linie dünn, 4=Boden-Glühen. */
-	public int pathStyle = 4;
+	/** Pfad-Stil: 0=Linie (Tiefe), 1=Bändchen, 2=Würfel, 3=Linie dünn, 4=Boden-Glühen, 5=Leucht-Blöcke. */
+	public int pathStyle = 0;
 	/** Gelernte Emissär-Positionen je Gebiets-Stichwort ([x,y,z]) – einmal gesehen, dauerhaft gemerkt. */
 	public Map<String, List<Integer>> learnedEmissary = new HashMap<>();
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
