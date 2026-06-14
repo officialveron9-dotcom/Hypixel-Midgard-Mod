@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14i (Gebiets-Emissaer, Pfad-Drossel, Label 2-zeilig skalierend ohne BG)");
+		System.out.println("[Midgard] init build=2026-06-14j (Pfad als 3D-Wuerfel in der Welt, eigener Puffer)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -74,6 +74,18 @@ public class Midgard implements ClientModInitializer {
 		// Abgebaute Blöcke an den Farming-Tracker melden (Blöcke/s + Crop-Erkennung).
 		net.fabricmc.fabric.api.event.client.player.ClientPlayerBlockBreakEvents.AFTER.register(
 				(world, player, pos, state) -> com.midgard.garden.FarmingTracker.INSTANCE.onBlockBroken(state));
+
+		// Pfad als durchsichtige 3D-Würfel in der Welt (eigener Puffer -> kann
+		// die Engine nicht crashen). Nach den Entities gezeichnet.
+		net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents.AFTER_ENTITIES.register(ctx -> {
+			try {
+				if (config != null && config.miningPathLine) {
+					com.midgard.util.PathRenderer.render(ctx);
+				}
+			} catch (Throwable t) {
+				logOnce("Pfad3D", t);
+			}
+		});
 
 		// Chat-Nachrichten an den Live-Event-Tracker weitergeben (nur lesen, nie senden).
 		ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
@@ -156,10 +168,6 @@ public class Midgard implements ClientModInitializer {
 			}
 			try {
 				com.midgard.util.Waypoints.render(context, com.midgard.mining.MiningWaypoints.markers());
-				if (config != null && config.miningPathLine) {
-					com.midgard.util.Waypoints.renderPolyline(context,
-							com.midgard.util.PathFinder.currentPath(), 0xFFF2772F);
-				}
 			} catch (Throwable t) {
 				logOnce("Wegpunkte", t);
 			}
