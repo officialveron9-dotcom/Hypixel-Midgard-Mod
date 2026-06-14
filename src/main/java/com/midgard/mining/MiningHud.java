@@ -22,7 +22,9 @@ public final class MiningHud {
 
 	public static final String KEY_COMMISSIONS = "MINING_COMMISSIONS";
 	public static final String KEY_ABILITY = "MINING_ABILITY";
-	public static final String KEY_EVENT = "MINING_EVENT";
+	// Eigener Schlüssel (NICHT EventType.MINING_EVENT.name()), damit das Element
+	// als festes Mining-Element gilt und der "nur hier / überall"-Schalter greift.
+	public static final String KEY_EVENT = "MINING_EVENT_HUD";
 	public static final String KEY_POWDER = "MINING_POWDER";
 
 	private static final int GREEN = 0xFF5BE36B;

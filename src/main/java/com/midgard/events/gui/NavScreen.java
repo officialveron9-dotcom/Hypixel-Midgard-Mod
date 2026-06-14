@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.midgard.mining.CrystalNav;
+import com.midgard.mining.MiningData;
+import com.midgard.mining.MiningWaypoints;
 
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
@@ -11,10 +13,10 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 
 /**
- * Crystal-Hollows-Navi-Liste: zeigt alle Orte. Bereits entdeckte (oder der
- * feste Nucleus) sind anklickbar und starten die Navigation dorthin; noch
- * nicht entdeckte sind ausgegraut ("erst betreten"). Unten ein Knopf, um die
- * laufende Navigation abzubrechen.
+ * Navi-Ziel wählen. In Crystal Hollows: alle Orte (entdeckte/Nucleus anklickbar,
+ * Rest ausgegraut). In den Dwarven Mines: die Emissär-Gebiete plus "Auto"
+ * (zurück zur automatischen Commission-Navigation). Unten: nahe NPCs anzeigen
+ * und laufende Navigation abbrechen.
  */
 public class NavScreen extends Screen {
 
@@ -27,6 +29,10 @@ public class NavScreen extends Screen {
 	private static final int BORDER = 0x33FFFFFF;
 	private static final int RED = 0xFFE0443C;
 
+	/** Eine Zeile in der Auswahl. */
+	private record NavRow(String label, String tag, boolean enabled, boolean active, Runnable action) {
+	}
+
 	private record Clickable(int x1, int y1, int x2, int y2, Runnable action) {
 		boolean contains(double mx, double my) {
 			return mx >= x1 && mx <= x2 && my >= y1 && my <= y2;
@@ -37,8 +43,40 @@ public class NavScreen extends Screen {
 	private final List<Clickable> clickables = new ArrayList<>();
 
 	public NavScreen(Screen parent) {
-		super(Text.literal("Crystal Hollows Navi"));
+		super(Text.literal("Navi-Ziel"));
 		this.parent = parent;
+	}
+
+	/** Baut die Zeilen je nach aktuellem Ort. */
+	private List<NavRow> buildRows() {
+		List<NavRow> rows = new ArrayList<>();
+		if (MiningData.INSTANCE.onCrystalHollows) {
+			for (String loc : CrystalNav.LOCATIONS) {
+				boolean known = CrystalNav.isLearned(loc);
+				boolean active = loc.equals(CrystalNav.targetName());
+				String tag = !known ? "erst betreten" : active ? "aktiv" : "navigieren";
+				rows.add(new NavRow(loc, tag, known, active, () -> {
+					CrystalNav.setTarget(loc);
+					close();
+				}));
+			}
+		} else if (MiningData.INSTANCE.onMiningIsland) {
+			boolean auto = !MiningWaypoints.hasManual();
+			rows.add(new NavRow("Auto (nächste Commission)", auto ? "aktiv" : "automatisch", true, auto, () -> {
+				MiningWaypoints.clearManual();
+				close();
+			}));
+			String cur = MiningWaypoints.hasManual() ? MiningWaypoints.manual().label() : null;
+			for (MiningWaypoints.NavOption o : MiningWaypoints.dwarvenTargets()) {
+				boolean active = o.name().equals(cur);
+				String tag = active ? "aktiv" : o.learned() ? "navigieren" : "ungefähr";
+				rows.add(new NavRow(o.name(), tag, true, active, () -> {
+					MiningWaypoints.setManual(o.x(), o.y(), o.z(), o.name());
+					close();
+				}));
+			}
+		}
+		return rows;
 	}
 
 	@Override
@@ -46,42 +84,48 @@ public class NavScreen extends Screen {
 		clickables.clear();
 		context.fill(0, 0, this.width, this.height, 0xAA000000);
 
-		int w = 240;
+		List<NavRow> rows = buildRows();
+		String title = MiningData.INSTANCE.onCrystalHollows ? "Crystal Hollows – Ziel wählen"
+				: MiningData.INSTANCE.onMiningIsland ? "Dwarven Mines – Ziel wählen"
+						: "Navi-Ziel wählen";
+
+		int w = 250;
 		int rowH = 20;
-		int n = CrystalNav.LOCATIONS.size();
 		int headH = 26;
 		int footH = 56;
-		int h = headH + n * rowH + footH;
+		boolean empty = rows.isEmpty();
+		int bodyH = empty ? 24 : rows.size() * rowH;
+		int h = headH + bodyH + footH;
 		int x = (this.width - w) / 2;
 		int y = (this.height - h) / 2;
 
 		context.fill(x - 1, y - 1, x + w + 1, y + h + 1, BORDER);
 		context.fill(x, y, x + w, y + h, PANEL);
-		context.drawText(textRenderer, "Crystal Hollows – Ziel wählen", x + 12, y + 9, TEXT, false);
+		context.drawText(textRenderer, title, x + 12, y + 9, TEXT, false);
 
 		int ry = y + headH;
-		for (String loc : CrystalNav.LOCATIONS) {
-			boolean known = CrystalNav.isLearned(loc);
-			boolean isTarget = loc.equals(CrystalNav.targetName());
-			boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= ry && mouseY <= ry + rowH;
-			if (known && hover) {
-				context.fill(x, ry, x + w, ry + rowH, CARD_HOVER);
-			} else if (isTarget) {
-				context.fill(x, ry, x + w, ry + rowH, CARD);
+		if (empty) {
+			context.drawText(textRenderer, "Nur in Crystal Hollows / den Minen nutzbar.",
+					x + 12, ry + 8, DIM, false);
+			ry += bodyH;
+		} else {
+			for (NavRow r : rows) {
+				boolean hover = r.enabled() && mouseX >= x && mouseX <= x + w && mouseY >= ry && mouseY <= ry + rowH;
+				if (hover) {
+					context.fill(x, ry, x + w, ry + rowH, CARD_HOVER);
+				} else if (r.active()) {
+					context.fill(x, ry, x + w, ry + rowH, CARD);
+				}
+				int col = !r.enabled() ? DIM : r.active() ? ACCENT : TEXT;
+				context.drawText(textRenderer, r.label(), x + 12, ry + (rowH - 8) / 2, col, false);
+				int tagW = textRenderer.getWidth(r.tag());
+				context.drawText(textRenderer, r.tag(), x + w - 12 - tagW, ry + (rowH - 8) / 2,
+						!r.enabled() ? DIM : ACCENT, false);
+				if (r.enabled()) {
+					clickables.add(new Clickable(x, ry, x + w, ry + rowH, r.action()));
+				}
+				ry += rowH;
 			}
-			int col = !known ? DIM : isTarget ? ACCENT : TEXT;
-			context.drawText(textRenderer, loc, x + 12, ry + (rowH - 8) / 2, col, false);
-			String tag = !known ? "erst betreten" : isTarget ? "aktiv" : "navigieren";
-			int tagW = textRenderer.getWidth(tag);
-			context.drawText(textRenderer, tag, x + w - 12 - tagW, ry + (rowH - 8) / 2,
-					!known ? DIM : ACCENT, false);
-			if (known) {
-				clickables.add(new Clickable(x, ry, x + w, ry + rowH, () -> {
-					CrystalNav.setTarget(loc);
-					close();
-				}));
-			}
-			ry += rowH;
 		}
 
 		// "Nahe NPCs anzeigen" – schreibt Namen + IDs in den Chat.
@@ -99,18 +143,18 @@ public class NavScreen extends Screen {
 			close();
 		}));
 
-		// Abbrechen-Knopf.
+		// Abbrechen-Knopf (hebt CH- und manuelles Mining-Ziel auf).
+		boolean anyTarget = CrystalNav.hasTarget() || MiningWaypoints.hasManual();
 		int by = dy0 + bh + 4;
-		boolean chover = mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + bh;
+		boolean chover = anyTarget && mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + bh;
 		context.fill(bx, by, bx + bw, by + bh, chover ? 0xFF7A2A26 : 0xFF40201E);
-		String cancel = CrystalNav.hasTarget() ? "Navigation abbrechen (" + CrystalNav.targetName() + ")"
-				: "Keine Navigation aktiv";
+		String cancel = anyTarget ? "Navigation abbrechen" : "Keine Navigation aktiv";
 		int cw = textRenderer.getWidth(cancel);
-		context.drawText(textRenderer, cancel, bx + (bw - cw) / 2, by + (bh - 8) / 2,
-				CrystalNav.hasTarget() ? RED : DIM, false);
-		if (CrystalNav.hasTarget()) {
+		context.drawText(textRenderer, cancel, bx + (bw - cw) / 2, by + (bh - 8) / 2, anyTarget ? RED : DIM, false);
+		if (anyTarget) {
 			clickables.add(new Clickable(bx, by, bx + bw, by + bh, () -> {
 				CrystalNav.cancel();
+				MiningWaypoints.clearManual();
 				close();
 			}));
 		}

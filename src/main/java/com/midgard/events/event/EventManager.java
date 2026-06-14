@@ -81,6 +81,11 @@ public class EventManager {
 		long nowMs = System.currentTimeMillis();
 		for (Map.Entry<EventType, Long> e : live.entrySet()) {
 			EventType type = e.getKey();
+			// Mining-Event hat seine eigene Mining-HUD-Box (MiningHud) – hier NICHT
+			// zusätzlich als globales Event ausgeben (sonst doppelt).
+			if (type == EventType.MINING_EVENT) {
+				continue;
+			}
 			if (!cfg.isEventEnabled(type)) {
 				continue;
 			}

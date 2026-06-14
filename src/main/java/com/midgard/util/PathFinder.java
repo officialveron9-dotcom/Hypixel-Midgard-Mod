@@ -47,10 +47,11 @@ public final class PathFinder {
 	}
 
 	/**
-	 * Aktualisiert den Pfad zum Ziel. {@code straight} = direkter Luftweg
-	 * (Teleport-Item), sonst echte Wegfindung über begehbare Blöcke.
+	 * Aktualisiert den Pfad zum Ziel. {@code flying} = Teleport-/Flug-Item
+	 * vorhanden: der Weg darf senkrecht durch Löcher/Decken gehen (kein fester
+	 * Boden nötig), aber NIE durch solide Wände. Sonst normale Boden-Wegfindung.
 	 */
-	public static void update(double gx, double gy, double gz, boolean straight) {
+	public static void update(double gx, double gy, double gz, boolean flying) {
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if (mc.player == null || mc.world == null) {
 			clear();
@@ -58,13 +59,6 @@ public final class PathFinder {
 		}
 		BlockPos start = mc.player.getBlockPos();
 		BlockPos goal = BlockPos.ofFloored(gx, gy, gz);
-
-		if (straight) {
-			path = List.of(
-					new Vec3d(start.getX() + 0.5, start.getY() + 0.1, start.getZ() + 0.5),
-					new Vec3d(goal.getX() + 0.5, goal.getY() + 0.1, goal.getZ() + 0.5));
-			return;
-		}
 
 		long now = System.currentTimeMillis();
 		boolean goalChanged = lastGoal == null || !goal.equals(lastGoal);
@@ -79,7 +73,7 @@ public final class PathFinder {
 		lastCalcMs = now;
 
 		try {
-			path = astar(mc.world, start, goal);
+			path = astar(mc.world, start, goal, flying);
 		} catch (Throwable t) {
 			path = List.of();
 		}
@@ -90,16 +84,16 @@ public final class PathFinder {
 	private record Node(BlockPos pos, double g, double f) {
 	}
 
-	private static List<Vec3d> astar(ClientWorld world, BlockPos start, BlockPos goal) {
+	private static List<Vec3d> astar(ClientWorld world, BlockPos start, BlockPos goal, boolean flying) {
 		if (start.getManhattanDistance(goal) > 600) {
 			return straightFallback(start, goal);
 		}
-		BlockPos s = standable(world, start);
+		BlockPos s = flying ? nearestPassable(world, start) : standable(world, start);
 		if (s == null) {
 			return straightFallback(start, goal);
 		}
-		// Begehbares Ziel finden; sonst Richtung Roh-Ziel laufen (Teilweg).
-		BlockPos gs = nearestStandable(world, goal);
+		// Erreichbares Ziel finden; sonst Richtung Roh-Ziel (Teilweg).
+		BlockPos gs = flying ? nearestPassable(world, goal) : nearestStandable(world, goal);
 		BlockPos target = gs != null ? gs : goal;
 
 		PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Double.compare(a.f, b.f));
@@ -128,21 +122,33 @@ public final class PathFinder {
 			}
 			for (int dx = -1; dx <= 1; dx++) {
 				for (int dz = -1; dz <= 1; dz++) {
-					if (dx == 0 && dz == 0) {
-						continue;
-					}
 					for (int dy = -1; dy <= 1; dy++) {
-						BlockPos np = cp.add(dx, dy, dz);
-						if (!canStand(world, np)) {
+						if (dx == 0 && dy == 0 && dz == 0) {
 							continue;
 						}
-						// Keine Diagonale durch Block-Ecken.
+						// Laufen: keine reinen Vertikal-Schritte (Boden nötig).
+						if (!flying && dx == 0 && dz == 0) {
+							continue;
+						}
+						BlockPos np = cp.add(dx, dy, dz);
+						boolean ok = flying ? canFly(world, np) : canStand(world, np);
+						if (!ok) {
+							continue;
+						}
+						// Keine Diagonale durch Block-Ecken (waagerecht).
 						if (dx != 0 && dz != 0) {
 							if (!passable(world, cp.add(dx, 0, 0)) || !passable(world, cp.add(0, 0, dz))) {
 								continue;
 							}
 						}
-						double step = Math.sqrt(dx * dx + dz * dz) + (dy != 0 ? 0.5 : 0);
+						// Flug: senkrechte Diagonale nicht durch die Decke/Boden-Ecke.
+						if (flying && dy != 0 && (dx != 0 || dz != 0)) {
+							if (!passable(world, cp.add(0, dy, 0)) || !passable(world, cp.add(0, dy, 0).up())) {
+								continue;
+							}
+						}
+						double step = flying ? Math.sqrt(dx * dx + dy * dy + dz * dz)
+								: Math.sqrt(dx * dx + dz * dz) + (dy != 0 ? 0.5 : 0);
 						double ng = cur.g + step;
 						long key = np.asLong();
 						Double old = best.get(key);
@@ -260,6 +266,31 @@ public final class PathFinder {
 		}
 		BlockPos below = pos.down();
 		return !world.getBlockState(below).getCollisionShape(world, below).isEmpty();
+	}
+
+	/** Flug: Füße + Kopf frei (kein Boden nötig) – darf nicht in Wänden enden. */
+	private static boolean canFly(ClientWorld world, BlockPos pos) {
+		return passable(world, pos) && passable(world, pos.up());
+	}
+
+	/** Nächste freie (durchflugbare) Zelle um pos herum (±3). */
+	private static BlockPos nearestPassable(ClientWorld world, BlockPos pos) {
+		if (canFly(world, pos)) {
+			return pos;
+		}
+		for (int r = 1; r <= 3; r++) {
+			for (int dy = -r; dy <= r; dy++) {
+				for (int dx = -r; dx <= r; dx++) {
+					for (int dz = -r; dz <= r; dz++) {
+						BlockPos n = pos.add(dx, dy, dz);
+						if (canFly(world, n)) {
+							return n;
+						}
+					}
+				}
+			}
+		}
+		return null;
 	}
 
 	/** Sucht vom Startpunkt aus den nächstgelegenen begehbaren Block (±2 vertikal). */

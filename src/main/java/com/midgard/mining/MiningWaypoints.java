@@ -41,8 +41,64 @@ public final class MiningWaypoints {
 			new Area("forge", 0, 145, -20));
 
 	private static volatile List<Marker> cached = List.of();
+	/** Manuell gewähltes Navi-Ziel (Navi-Liste); hat Vorrang vor der Auto-Wahl. */
+	private static volatile Marker manual;
 
 	private MiningWaypoints() {
+	}
+
+	/** Ein wählbares Dwarven-Ziel (Name + Koordinaten; learned = exakt gemerkt). */
+	public record NavOption(String name, double x, double y, double z, boolean learned) {
+	}
+
+	/** Anzeigename eines Gebiets-Stichworts. */
+	private static String areaDisplay(String kw) {
+		switch (kw) {
+			case "royal":
+				return "Royal Mines";
+			case "cliffside":
+				return "Cliffside";
+			case "lava spring":
+				return "Lava Springs";
+			case "rampart":
+				return "Rampart's Quarry";
+			case "upper mines":
+				return "Upper Mines";
+			case "forge":
+				return "The Forge";
+			default:
+				return kw;
+		}
+	}
+
+	/** Auswählbare Ziele in den Dwarven Mines (Emissär-Gebiete; gemerkt > ungefähr). */
+	public static List<NavOption> dwarvenTargets() {
+		List<NavOption> out = new ArrayList<>();
+		for (Area a : AREAS) {
+			List<Integer> learned = Midgard.config != null ? Midgard.config.learnedEmissary.get(a.keyword()) : null;
+			if (learned != null && learned.size() == 3) {
+				out.add(new NavOption(areaDisplay(a.keyword()), learned.get(0), learned.get(1), learned.get(2), true));
+			} else {
+				out.add(new NavOption(areaDisplay(a.keyword()), a.x(), a.y(), a.z(), false));
+			}
+		}
+		return out;
+	}
+
+	public static void setManual(double x, double y, double z, String name) {
+		manual = new Marker(x, y, z, name, EMISSARY_COLOR);
+	}
+
+	public static void clearManual() {
+		manual = null;
+	}
+
+	public static Marker manual() {
+		return manual;
+	}
+
+	public static boolean hasManual() {
+		return manual != null;
 	}
 
 	/** Ungefähre Gebiets-Koordinaten zum Commission-Namen oder null. */
@@ -61,6 +117,7 @@ public final class MiningWaypoints {
 		if (mc == null || mc.world == null || mc.player == null || Midgard.config == null
 				|| !MiningData.INSTANCE.onMiningIsland) {
 			cached = List.of();
+			manual = null; // Mine verlassen -> manuelles Ziel aufheben
 			return;
 		}
 
@@ -159,6 +216,9 @@ public final class MiningWaypoints {
 
 		cluster(goblins, "Goblins", out);
 		cluster(golems, "Golems", out);
+		if (manual != null) {
+			out.add(manual);
+		}
 		cached = out;
 	}
 
@@ -199,6 +259,10 @@ public final class MiningWaypoints {
 
 	/** Der dem Spieler nächste Marker (für die Pfad-Linie) oder null. */
 	public static Marker nearest() {
+		Marker mm = manual; // manuelles Ziel hat Vorrang
+		if (mm != null) {
+			return mm;
+		}
 		List<Marker> list = cached;
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if (list.isEmpty() || mc.player == null) {

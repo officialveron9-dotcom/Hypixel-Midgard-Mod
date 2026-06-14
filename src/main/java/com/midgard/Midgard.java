@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14r (Pfad: 4 Linien-Stile waehlbar, Tiefentest, mittig im Flur)");
+		System.out.println("[Midgard] init build=2026-06-14s (Boden-Gluehen-Pfad+glatt, Flug-Teleport, Navi-Ziel-Wahl, Editor-Doppel weg)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -171,10 +171,17 @@ public class Midgard implements ClientModInitializer {
 		// HUD zeichnen. Jeder Teil eigen abgesichert – ein Fehler darf NIE das
 		// Spiel zum Absturz bringen (Crash-Schutz in den Höhlen).
 		HudRenderCallback.EVENT.register((context, tickCounter) -> {
-			try {
-				EventHud.INSTANCE.render(context);
-			} catch (Throwable t) {
-				logOnce("HUD", t);
+			// Im HUD-Editor zeichnet dieser bereits die Vorschau – das Live-HUD
+			// dahinter würde sich doppeln (Vorschau "Pickobulus 47s" über echtem
+			// "Bereit"). Darum hier auslassen, solange der Editor offen ist.
+			boolean inHudEditor = net.minecraft.client.MinecraftClient.getInstance()
+					.currentScreen instanceof com.midgard.events.gui.HudPositionScreen;
+			if (!inHudEditor) {
+				try {
+					EventHud.INSTANCE.render(context);
+				} catch (Throwable t) {
+					logOnce("HUD", t);
+				}
 			}
 			try {
 				com.midgard.bars.StatusBars.render(context);
