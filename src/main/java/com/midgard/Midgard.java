@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14q (Navi: Knopf zeigt NPC-Namen+IDs in der Naehe im Chat)");
+		System.out.println("[Midgard] init build=2026-06-14r (Pfad: 4 Linien-Stile waehlbar, Tiefentest, mittig im Flur)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

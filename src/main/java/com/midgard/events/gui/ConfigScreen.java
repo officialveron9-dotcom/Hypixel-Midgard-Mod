@@ -391,11 +391,26 @@ public class ConfigScreen extends Screen {
 					cfg.miningPathLine = !cfg.miningPathLine;
 					cfg.save();
 				}));
+		if (cfg.miningPathLine) {
+			out.add(compactCycleRow(context, mouseX, mouseY, cardX, cardW, "Linien-Stil (zum Vergleichen)",
+					() -> pathStyleName(cfg.pathStyle), () -> {
+						cfg.pathStyle = (cfg.pathStyle + 1) % PATH_STYLES.length;
+						cfg.save();
+					}));
+		}
 		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Teleport-Item (Weg über Luft)",
 				() -> cfg.pathTeleport, () -> {
 					cfg.pathTeleport = !cfg.pathTeleport;
 					cfg.save();
 				}));
+	}
+
+	/** Namen der Linien-Stile (Reihenfolge = pathStyle 0..3). */
+	private static final String[] PATH_STYLES = {
+			"Linie (Tiefe)", "Bändchen (durch Wände)", "Würfel-Spur", "Linie (durch Wände)" };
+
+	private static String pathStyleName(int s) {
+		return s >= 0 && s < PATH_STYLES.length ? PATH_STYLES[s] : PATH_STYLES[0];
 	}
 
 	/** Reine Info-/Hinweiszeile (nicht klickbar). */
@@ -415,6 +430,25 @@ public class ConfigScreen extends Screen {
 			int togW = 26;
 			int togH = 13;
 			drawToggle(context, cardX + cardW - 10 - togW, y + (EVENT_H - togH) / 2, togT, togW, togH);
+			clickables.add(new Clickable(cardX, y, cardX + cardW, y + EVENT_H, onClick));
+		}, title);
+	}
+
+	/** Kompakte Auswahl-Zeile: Klick schaltet auf den nächsten Wert (Pille rechts). */
+	private Row compactCycleRow(DrawContext context, int mouseX, int mouseY, int cardX, int cardW,
+			String title, java.util.function.Supplier<String> value, Runnable onClick) {
+		return new Row(EVENT_H + EVENT_GAP, y -> {
+			boolean hover = hovering(mouseX, mouseY, cardX, y, cardW, EVENT_H);
+			float hoverT = animate("cy" + title, hover, 14f);
+			sprite(context, cardX, y, cardW, EVENT_H, lerpColor(CARD, CARD_HOVER, hoverT));
+			txtVC(context, title, cardX + 12, y, EVENT_H, TEXT, true);
+			String v = "‹ " + value.get() + " ›";
+			int pad = 8;
+			int pillW = txtW(v, false) + pad * 2;
+			int pillH = 15;
+			int pillX = cardX + cardW - 10 - pillW;
+			sprite(context, pillX, y + (EVENT_H - pillH) / 2, pillW, pillH, lerpColor(CARD_HOVER, ACCENT, hoverT * 0.25f));
+			txtVC(context, v, pillX + pad, y, EVENT_H, ACCENT, false);
 			clickables.add(new Clickable(cardX, y, cardX + cardW, y + EVENT_H, onClick));
 		}, title);
 	}

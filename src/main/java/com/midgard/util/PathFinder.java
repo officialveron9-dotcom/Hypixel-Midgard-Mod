@@ -120,7 +120,7 @@ public final class PathFinder {
 				bestNode = cp;
 			}
 			if (cp.isWithinDistance(target, 1.6)) {
-				return build(came, cp, s);
+				return build(world, came, cp, s);
 			}
 			Double bg = best.get(cp.asLong());
 			if (bg != null && cur.g > bg + 1e-3) {
@@ -157,7 +157,7 @@ public final class PathFinder {
 		}
 		// Kein voller Weg gefunden -> Teilweg bis zum nächstgelegenen Punkt
 		// (folgt dem Boden), statt einer geraden Linie durch die Wand.
-		return bestNode.equals(s) ? straightFallback(start, goal) : build(came, bestNode, s);
+		return bestNode.equals(s) ? straightFallback(start, goal) : build(world, came, bestNode, s);
 	}
 
 	private static double heur(BlockPos a, BlockPos b) {
@@ -165,7 +165,7 @@ public final class PathFinder {
 		return Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
-	private static List<Vec3d> build(Map<Long, BlockPos> came, BlockPos end, BlockPos start) {
+	private static List<Vec3d> build(ClientWorld world, Map<Long, BlockPos> came, BlockPos end, BlockPos start) {
 		List<BlockPos> nodes = new ArrayList<>();
 		BlockPos c = end;
 		int guard = 0;
@@ -179,9 +179,65 @@ public final class PathFinder {
 		Collections.reverse(nodes);
 		List<Vec3d> out = new ArrayList<>();
 		for (BlockPos p : nodes) {
-			out.add(new Vec3d(p.getX() + 0.5, p.getY() + 0.08, p.getZ() + 0.5));
+			double[] cxz = centerXZ(world, p);
+			out.add(new Vec3d(cxz[0], p.getY() + 0.08, cxz[1]));
 		}
+		smooth(out);
 		return out;
+	}
+
+	/**
+	 * Rückt einen Knoten quer zur Flur-Richtung in die Mitte des freien Raums.
+	 * Misst die freie Breite nach Osten/Westen/Norden/Süden; ist eine Achse schmal
+	 * (Korridor), wird der Punkt auf die Mitte dieser Achse zentriert. Breite Räume
+	 * bleiben unverändert, damit nichts in die Länge verschoben wird.
+	 */
+	private static double[] centerXZ(ClientWorld world, BlockPos p) {
+		int e = openReach(world, p, 1, 0);
+		int w = openReach(world, p, -1, 0);
+		int s = openReach(world, p, 0, 1);
+		int nn = openReach(world, p, 0, -1);
+		double cx = p.getX() + 0.5;
+		double cz = p.getZ() + 0.5;
+		if (e + w <= 6) { // in x schmal -> quer zentrieren
+			cx += clamp((e - w) * 0.5, -2.5, 2.5);
+		}
+		if (s + nn <= 6) { // in z schmal -> quer zentrieren
+			cz += clamp((s - nn) * 0.5, -2.5, 2.5);
+		}
+		return new double[] { cx, cz };
+	}
+
+	/** Anzahl freier Blöcke (Füße + Kopf) in eine Richtung, max. 5. */
+	private static int openReach(ClientWorld world, BlockPos p, int dx, int dz) {
+		int r = 0;
+		for (int i = 1; i <= 5; i++) {
+			BlockPos q = p.add(dx * i, 0, dz * i);
+			if (passable(world, q) && passable(world, q.up())) {
+				r = i;
+			} else {
+				break;
+			}
+		}
+		return r;
+	}
+
+	private static double clamp(double v, double lo, double hi) {
+		return v < lo ? lo : v > hi ? hi : v;
+	}
+
+	/** Leichte Glättung (x/z) über die Nachbarn, damit die Linie ruhig fließt. */
+	private static void smooth(List<Vec3d> pts) {
+		if (pts.size() < 3) {
+			return;
+		}
+		List<Vec3d> src = new ArrayList<>(pts);
+		for (int i = 1; i < pts.size() - 1; i++) {
+			Vec3d a = src.get(i - 1), b = src.get(i), d = src.get(i + 1);
+			double nx = b.x * 0.5 + a.x * 0.25 + d.x * 0.25;
+			double nz = b.z * 0.5 + a.z * 0.25 + d.z * 0.25;
+			pts.set(i, new Vec3d(nx, b.y, nz));
+		}
 	}
 
 	private static List<Vec3d> straightFallback(BlockPos start, BlockPos goal) {
