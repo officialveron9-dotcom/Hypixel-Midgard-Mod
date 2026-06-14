@@ -44,7 +44,9 @@ public final class CrystalNav {
 					List.of("Professor Robot")),
 			new CrystalArea("Sapphire Crystal", 0xFF4F9BFF, "mithril",
 					List.of("Keeper of Diamond", "Keeper of Emerald",
-							"Keeper of Lapis", "Keeper of Gold")));
+							"Keeper of Lapis", "Keeper of Gold")),
+			new CrystalArea("Topaz Crystal", 0xFFFFD84D, "khazad",
+					List.of("Bal")));
 
 	/** Anpeilbare Orte: Mitte + alle NPCs aus {@link #CRYSTALS}. */
 	public static final List<String> LOCATIONS = buildLocations();
@@ -64,7 +66,6 @@ public final class CrystalNav {
 	 */
 	private static final Map<String, String> NPC_TO_LOCATION = Map.ofEntries(
 			Map.entry("yolkar", "King Yolkar"),
-			Map.entry("kalhuiki", "Kalhuiki Door Guardian"),
 			Map.entry("door guardian", "Kalhuiki Door Guardian"),
 			Map.entry("professor", "Professor Robot"));
 
@@ -84,7 +85,8 @@ public final class CrystalNav {
 			Map.entry("Keeper of Diamond", new int[] { 480, 130, 330 }),      // Nord (Mithril)
 			Map.entry("Keeper of Emerald", new int[] { 520, 130, 330 }),
 			Map.entry("Keeper of Lapis", new int[] { 540, 130, 350 }),
-			Map.entry("Keeper of Gold", new int[] { 500, 130, 350 }));
+			Map.entry("Keeper of Gold", new int[] { 500, 130, 350 }),
+			Map.entry("Bal", new int[] { 469, 81, 383 }));                    // Magma (Khazad-dûm)
 
 	private static final Map<String, int[]> learned = new HashMap<>();
 	private static volatile String targetName;
@@ -127,9 +129,18 @@ public final class CrystalNav {
 				String en = ScoreboardReader.stripFormatting(e.getName().getString());
 				String low = en.toLowerCase(Locale.ROOT);
 				int[] pos = { (int) Math.round(e.getX()), (int) Math.round(e.getY()), (int) Math.round(e.getZ()) };
-				// voller Ortsname im NPC-Namen (z. B. "Keeper of Diamond")
+				// voller Ortsname im NPC-Namen (z. B. "Keeper of Diamond"). Kurze
+				// Namen (z. B. "Bal") nur als GANZES Wort, sonst trifft es "Blaze"/
+				// Spielernamen. Lange Namen normal als Teilstring.
 				for (String loc : LOCATIONS) {
-					if (!loc.equals("Crystal Nucleus") && low.contains(loc.toLowerCase(Locale.ROOT))) {
+					if (loc.equals("Crystal Nucleus")) {
+						continue;
+					}
+					String key = loc.toLowerCase(Locale.ROOT);
+					boolean match = loc.length() >= 5
+							? low.contains(key)
+							: low.matches(".*\\b" + key + "\\b.*");
+					if (match) {
 						learned.put(loc, pos);
 					}
 				}

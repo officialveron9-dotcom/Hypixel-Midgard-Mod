@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15p (Minimap echte Map-Farben + Kreuz-Layout; Navi nach Kristall gruppiert mit Gem-Icons; alle CH-NPCs per Name)");
+		System.out.println("[Midgard] init build=2026-06-15q (Bal/Topaz ergaenzt; Jungle-Fix: kein Fehlmatch der Kalhuiki-Tribe-Mobs mehr)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

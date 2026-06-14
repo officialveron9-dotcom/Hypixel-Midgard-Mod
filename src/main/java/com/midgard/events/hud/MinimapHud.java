@@ -45,6 +45,7 @@ public final class MinimapHud {
 	private static final int C_JADE = 0xFF3FD466;
 	private static final int C_AMETHYST = 0xFFB05CFF;
 	private static final int C_SAPPHIRE = 0xFF4F9BFF;
+	private static final int C_TOPAZ = 0xFFFFD84D;
 
 	private MinimapHud() {
 	}
@@ -151,6 +152,9 @@ public final class MinimapHud {
 		}
 		if (n.contains("keeper") || n.contains("mithril")) {
 			return C_SAPPHIRE;
+		}
+		if (n.startsWith("bal") || n.contains("topaz") || n.contains("magma") || n.contains("khazad")) {
+			return C_TOPAZ;
 		}
 		return 0xFFFFE070;
 	}
