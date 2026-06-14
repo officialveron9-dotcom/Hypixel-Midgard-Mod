@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15r (FPS: A*-Cache+Zeitbudget, Map rechteckig+richtige Farben; Weg hoeher; nach-oben bei Sackgasse; kein random Verschwinden; Vorab-Gebiete)");
+		System.out.println("[Midgard] init build=2026-06-15s (Linie wird an Waenden geometrisch abgeschnitten - nie mehr sichtbar durch Wand; Render-Reichweite begrenzt)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

@@ -35,6 +35,7 @@ public final class PathRenderer {
 	private static final int R = 245, G = 130, B = 50; // Akzent-Orange
 	private static final int ALPHA = 220;
 	private static final double START_AHEAD = 1.3; // Blöcke vor dem Spieler beginnen
+	private static final double MAX_RENDER = 80.0; // nur so weit nach vorn zeichnen (FPS + Relevanz)
 
 	private static BufferAllocator allocator;
 	private static VertexConsumerProvider.Immediate immediate;
@@ -72,12 +73,41 @@ public final class PathRenderer {
 		Matrix4f m = ms.peek().getPositionMatrix();
 
 		VertexConsumer vc = fillVc();
+		net.minecraft.world.World w = mc.world;
+		double rendered = 0;
+		outer:
 		for (int i = 0; i + 1 < rp.size(); i++) {
-			tube(vc, m, rp.get(i), rp.get(i + 1), 0.085f, 0.05f, ALPHA);
+			Vec3d a = rp.get(i), b = rp.get(i + 1);
+			double segLen = a.distanceTo(b);
+			if (segLen < 1e-6) {
+				continue;
+			}
+			int steps = Math.max(1, (int) Math.ceil(segLen / 0.5));
+			for (int k = 0; k < steps; k++) {
+				if (rendered > MAX_RENDER) {
+					break outer;
+				}
+				Vec3d p0 = lerp(a, b, (double) k / steps);
+				Vec3d p1 = lerp(a, b, (double) (k + 1) / steps);
+				rendered += p0.distanceTo(p1);
+				// Stück, das in einem soliden Block steckt, NICHT zeichnen -> die
+				// Linie kann nie sichtbar durch eine Wand gehen (unabhängig vom
+				// Tiefentest). Nur freie Luft wird gezeichnet.
+				if (isSolid(w, lerp(p0, p1, 0.5))) {
+					continue;
+				}
+				tube(vc, m, p0, p1, 0.085f, 0.05f, ALPHA);
+			}
 		}
 
 		ms.pop();
 		immediate.draw();
+	}
+
+	/** Liegt der Punkt in einem soliden (kollidierenden) Block? */
+	private static boolean isSolid(net.minecraft.world.World w, Vec3d p) {
+		net.minecraft.util.math.BlockPos bp = net.minecraft.util.math.BlockPos.ofFloored(p.x, p.y, p.z);
+		return !w.getBlockState(bp).getCollisionShape(w, bp).isEmpty();
 	}
 
 	/**
