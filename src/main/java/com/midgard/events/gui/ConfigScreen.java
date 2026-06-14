@@ -381,7 +381,7 @@ public class ConfigScreen extends Screen {
 					cfg.miningGoblinWaypoints = !cfg.miningGoblinWaypoints;
 					cfg.save();
 				}));
-		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Emissary-Wegpunkte (bei 100%)",
+		out.add(compactToggleRow(context, mouseX, mouseY, cardX, cardW, "Commission-Wegpunkte (Gebiet + Abgabe)",
 				() -> cfg.miningCommissionWaypoints, () -> {
 					cfg.miningCommissionWaypoints = !cfg.miningCommissionWaypoints;
 					cfg.save();

@@ -21,12 +21,36 @@ public final class MiningWaypoints {
 
 	private static final int MOB_COLOR = 0xFF5BE36B;
 	private static final int EMISSARY_COLOR = 0xFFFFC85C;
+	private static final int AREA_COLOR = 0xFF4DA6FF;
 	/** Horizontaler Radius (Blöcke), innerhalb dessen Mobs zu einem Cluster gehören. */
 	private static final double CLUSTER_R = 16.0;
+
+	/** Dwarven-Mines-Gebiete: Stichwort im Commission-Namen -> ungefähre Koordinaten. */
+	private record Area(String keyword, int x, int y, int z) {
+	}
+
+	private static final List<Area> AREAS = List.of(
+			new Area("royal", 170, 150, 50),
+			new Area("cliffside", 1, 128, 46),
+			new Area("lava spring", 41, 201, -24),
+			new Area("rampart", -106, 193, -43),
+			new Area("upper mines", -130, 201, -32),
+			new Area("forge", 0, 145, -20));
 
 	private static volatile List<Marker> cached = List.of();
 
 	private MiningWaypoints() {
+	}
+
+	/** Ungefähre Gebiets-Koordinaten zum Commission-Namen oder null. */
+	private static Area areaFor(String commissionName) {
+		String low = commissionName.toLowerCase(Locale.ROOT);
+		for (Area a : AREAS) {
+			if (low.contains(a.keyword())) {
+				return a;
+			}
+		}
+		return null;
 	}
 
 	/** Vom Client-Tick aufgerufen (nicht pro Frame). */
@@ -38,6 +62,7 @@ public final class MiningWaypoints {
 		}
 
 		boolean mobs = Midgard.config.miningGoblinWaypoints;
+		boolean comWp = Midgard.config.miningCommissionWaypoints;
 		boolean anyDone = false;
 		for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
 			if (c.done()) {
@@ -45,18 +70,33 @@ public final class MiningWaypoints {
 				break;
 			}
 		}
-		boolean emissaries = Midgard.config.miningCommissionWaypoints && anyDone;
-		if (!mobs && !emissaries) {
+		boolean emissaries = comWp && anyDone;
+
+		List<Marker> out = new ArrayList<>();
+
+		// Gebiets-Wegpunkte für AKTIVE Commissions (ungefähre Dwarven-Koordinaten).
+		if (comWp) {
+			for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
+				if (c.done()) {
+					continue;
+				}
+				Area a = areaFor(c.name());
+				if (a != null) {
+					out.add(new Marker(a.x(), a.y(), a.z(), c.name() + " (ca.)", AREA_COLOR));
+				}
+			}
+		}
+
+		if (!mobs && !emissaries && out.isEmpty()) {
 			cached = List.of();
 			return;
 		}
 
 		List<double[]> goblins = new ArrayList<>();
 		List<double[]> golems = new ArrayList<>();
-		List<Marker> out = new ArrayList<>();
 
 		int scanned = 0;
-		for (Entity e : mc.world.getEntities()) {
+		for (Entity e : (mobs || emissaries) ? mc.world.getEntities() : java.util.List.<Entity>of()) {
 			if (scanned++ > 400) {
 				break;
 			}
@@ -86,11 +126,7 @@ public final class MiningWaypoints {
 		return cached;
 	}
 
-	/**
-	 * Der dem Spieler nächste Marker (für die Pfad-Linie) oder null. Sind
-	 * Emissäre dabei (= eine Commission ist fertig), wird der NÄCHSTE EMISSÄR
-	 * bevorzugt – damit der Weg zur Abgabe gezeigt wird.
-	 */
+	/** Der dem Spieler nächste Marker (für die Pfad-Linie) oder null. */
 	public static Marker nearest() {
 		List<Marker> list = cached;
 		MinecraftClient mc = MinecraftClient.getInstance();
@@ -98,19 +134,9 @@ public final class MiningWaypoints {
 			return null;
 		}
 		double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
-		boolean hasEmissary = false;
-		for (Marker m : list) {
-			if (m.color() == EMISSARY_COLOR) {
-				hasEmissary = true;
-				break;
-			}
-		}
 		Marker best = null;
 		double bestD = Double.MAX_VALUE;
 		for (Marker m : list) {
-			if (hasEmissary && m.color() != EMISSARY_COLOR) {
-				continue; // bei fertiger Commission nur Emissäre als Ziel
-			}
 			double dx = m.x() - px, dy = m.y() - py, dz = m.z() - pz;
 			double d = dx * dx + dy * dy + dz * dz;
 			if (d < bestD) {
