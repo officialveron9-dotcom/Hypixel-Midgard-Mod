@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.google.gson.Gson;
@@ -71,6 +72,8 @@ public class ModConfig {
 	public boolean miningPathLine = true;
 	/** Teleport-Item vorhanden: Pfad darf über die Luft (gerade) gehen statt am Boden. */
 	public boolean pathTeleport = false;
+	/** Gelernte Emissär-Positionen je Gebiets-Stichwort ([x,y,z]) – einmal gesehen, dauerhaft gemerkt. */
+	public Map<String, List<Integer>> learnedEmissary = new HashMap<>();
 	/** URL der prices.json (AH-Statistik + Jacob-Plan). Leer = nur direkte Bazaar-Preise. */
 	public String priceApiUrl = "https://officialveron9-dotcom.github.io/Hypixel-Midgard-Mod/prices.json";
 
@@ -249,6 +252,9 @@ public class ModConfig {
 					}
 					if (cfg.hudElementGlobal == null) {
 						cfg.hudElementGlobal = new HashMap<>();
+					}
+					if (cfg.learnedEmissary == null) {
+						cfg.learnedEmissary = new HashMap<>();
 					}
 					if (cfg.globalFontName == null) {
 						cfg.globalFontName = "";

@@ -22,8 +22,8 @@ import net.minecraft.util.math.Vec3d;
  */
 public final class PathRenderer {
 
-	private static final int R = 242, G = 119, B = 47, A = 170; // Akzent-Orange, halbdurchsichtig
-	private static final int MAX_BOXES = 160;
+	private static final int R = 245, G = 130, B = 50, A = 200; // Akzent-Orange, kräftiger
+	private static final int MAX_BOXES = 200;
 
 	private static BufferAllocator allocator;
 	private static VertexConsumerProvider.Immediate immediate;
@@ -58,26 +58,36 @@ public final class PathRenderer {
 		VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
 		int n = path.size();
 		int step = Math.max(1, (n - 1) / MAX_BOXES);
-		// Durchgehende Linie: Schlauch-Segmente zwischen aufeinanderfolgenden Punkten.
-		Vec3d prev = null;
-		for (int i = 0; i < n; i += step) {
-			Vec3d v = path.get(i);
-			if (prev != null) {
-				tube(vc, m, prev, v, 0.09f);
+
+		// Linie beginnt am Spieler und zeigt nur den NOCH offenen Rest -> bleibt
+		// ruhig und schrumpft hinter einem, statt komplett neu zu springen.
+		Vec3d feet = new Vec3d(mc.player.getX(), mc.player.getY() + 0.1, mc.player.getZ());
+		int startIdx = 0;
+		double bestD = Double.MAX_VALUE;
+		for (int i = 0; i < n; i++) {
+			double d = path.get(i).squaredDistanceTo(feet);
+			if (d < bestD) {
+				bestD = d;
+				startIdx = i;
 			}
+		}
+
+		Vec3d prev = feet;
+		for (int i = startIdx; i < n; i += step) {
+			Vec3d v = path.get(i);
+			tube(vc, m, prev, v, 0.13f, 0.05f);
 			prev = v;
 		}
-		// letztes Segment bis zum Ziel sicher anschließen
-		if (prev != null && n >= 1 && !prev.equals(path.get(n - 1))) {
-			tube(vc, m, prev, path.get(n - 1), 0.09f);
+		if (!prev.equals(path.get(n - 1))) {
+			tube(vc, m, prev, path.get(n - 1), 0.13f, 0.05f);
 		}
 		ms.pop();
 
 		immediate.draw();
 	}
 
-	/** Dünner rechteckiger Schlauch von a nach b (4 Quad-Seiten) = Linie in 3D. */
-	private static void tube(VertexConsumer vc, Matrix4f m, Vec3d a, Vec3d b, float t) {
+	/** Flaches Bändchen von a nach b (breit + flach) = Linie über dem Boden. */
+	private static void tube(VertexConsumer vc, Matrix4f m, Vec3d a, Vec3d b, float tH, float tV) {
 		double dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
 		double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
 		if (len < 1e-4) {
@@ -92,18 +102,18 @@ public final class PathRenderer {
 			ux = 1;
 			uy = 0;
 		}
-		// right = dir x up
+		// right = dir x up (horizontal, breit)
 		double rx = dy * uz - dz * uy, ry = dz * ux - dx * uz, rz = dx * uy - dy * ux;
 		double rl = Math.sqrt(rx * rx + ry * ry + rz * rz);
-		rx = rx / rl * t;
-		ry = ry / rl * t;
-		rz = rz / rl * t;
-		// up2 = dir x right
+		rx = rx / rl * tH;
+		ry = ry / rl * tH;
+		rz = rz / rl * tH;
+		// up2 = dir x right (vertikal, flach)
 		double px = dy * rz - dz * ry, py = dz * rx - dx * rz, pz = dx * ry - dy * rx;
 		double pl = Math.sqrt(px * px + py * py + pz * pz);
-		px = px / pl * t;
-		py = py / pl * t;
-		pz = pz / pl * t;
+		px = px / pl * tV;
+		py = py / pl * tV;
+		pz = pz / pl * tV;
 		// 4 Eckpunkte an a und b
 		float[] a1 = { (float) (a.x + rx + px), (float) (a.y + ry + py), (float) (a.z + rz + pz) };
 		float[] a2 = { (float) (a.x + rx - px), (float) (a.y + ry - py), (float) (a.z + rz - pz) };

@@ -24,9 +24,9 @@ public final class PathFinder {
 
 	private static final int MAX_EXPAND = 7000;
 	/** Mindestabstand (Blöcke), den man sich bewegen muss, bevor neu gerechnet wird. */
-	private static final int MOVE_THRESHOLD = 5;
-	/** Sonst nur alle paar Sekunden neu rechnen (kein Geflacker pro Meter). */
-	private static final long RECalc_MS = 2500;
+	private static final int MOVE_THRESHOLD = 8;
+	/** Sonst nur selten neu rechnen (Linie bleibt ruhig stehen). */
+	private static final long RECalc_MS = 4000;
 
 	private static volatile List<Vec3d> path = List.of();
 	private static BlockPos lastStart;

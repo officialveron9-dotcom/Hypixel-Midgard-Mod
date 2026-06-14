@@ -91,18 +91,51 @@ public final class MiningWaypoints {
 			}
 		}
 
-		// Commission-Wegpunkte: Ziel = Emissär-Person im Gebiet (wenn geladen),
-		// sonst die ungefähre Gebiets-Koordinate.
+		// Sichtbare Emissäre ihrer Region zuordnen und die exakte Position
+		// DAUERHAFT merken (einmal gesehen -> auch von weit weg direkt dahin).
+		if (comWp && !emissaries.isEmpty()) {
+			boolean changed = false;
+			for (double[] em : emissaries) {
+				Area a = nearestArea(em, 55);
+				if (a == null) {
+					continue;
+				}
+				List<Integer> cur = Midgard.config.learnedEmissary.get(a.keyword());
+				int ex = (int) Math.round(em[0]), ey = (int) Math.round(em[1]), ez = (int) Math.round(em[2]);
+				if (cur == null || cur.size() != 3 || Math.abs(cur.get(0) - ex) > 2 || Math.abs(cur.get(2) - ez) > 2) {
+					Midgard.config.learnedEmissary.put(a.keyword(), List.of(ex, ey, ez));
+					changed = true;
+				}
+			}
+			if (changed) {
+				Midgard.config.save();
+			}
+		}
+
+		// Commission-Wegpunkte: Ziel = geladene Emissär-Person -> gemerkte
+		// Position -> ungefähres Gebiet (in dieser Reihenfolge).
 		if (comWp) {
 			for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
 				Area a = areaFor(c.name());
 				if (a == null) {
 					continue;
 				}
-				double[] t = nearestTo(emissaries, a.x(), a.y(), a.z(), 45);
-				double tx = t != null ? t[0] : a.x();
-				double ty = t != null ? t[1] : a.y();
-				double tz = t != null ? t[2] : a.z();
+				double tx, ty, tz;
+				double[] live = nearestTo(emissaries, a.x(), a.y(), a.z(), 45);
+				List<Integer> learned = Midgard.config.learnedEmissary.get(a.keyword());
+				if (live != null) {
+					tx = live[0];
+					ty = live[1];
+					tz = live[2];
+				} else if (learned != null && learned.size() == 3) {
+					tx = learned.get(0);
+					ty = learned.get(1);
+					tz = learned.get(2);
+				} else {
+					tx = a.x();
+					ty = a.y();
+					tz = a.z();
+				}
 				if (c.done()) {
 					out.add(new Marker(tx, ty, tz, c.name() + " abgeben", EMISSARY_COLOR));
 				} else {
@@ -114,6 +147,21 @@ public final class MiningWaypoints {
 		cluster(goblins, "Goblins", out);
 		cluster(golems, "Golems", out);
 		cached = out;
+	}
+
+	/** Das einer Position nächstgelegene Gebiet innerhalb {@code range} Blöcken, oder null. */
+	private static Area nearestArea(double[] pos, double range) {
+		Area best = null;
+		double bestD = range * range;
+		for (Area a : AREAS) {
+			double dx = a.x() - pos[0], dy = a.y() - pos[1], dz = a.z() - pos[2];
+			double d = dx * dx + dy * dy + dz * dz;
+			if (d <= bestD) {
+				bestD = d;
+				best = a;
+			}
+		}
+		return best;
 	}
 
 	/** Nächste Position aus {@code pts} zu (x,y,z) innerhalb {@code range} Blöcken, oder null. */
