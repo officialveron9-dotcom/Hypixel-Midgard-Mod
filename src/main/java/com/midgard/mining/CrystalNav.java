@@ -74,6 +74,9 @@ public final class CrystalNav {
 			boolean diag = now - lastDiagMs > 20_000;
 			StringBuilder names = diag ? new StringBuilder() : null;
 			int scanned = 0;
+			double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
+			double goblinBestD = Double.MAX_VALUE;
+			int[] goblinBestPos = null;
 			for (Entity e : mc.world.getEntities()) {
 				if (scanned++ > 300 || e.getName() == null) {
 					continue;
@@ -93,9 +96,22 @@ public final class CrystalNav {
 						learned.put(e2.getValue(), pos);
 					}
 				}
+				// Jeder Goblin (außer King Yolkar) zählt als "Goblin Guard" – den
+				// NÄCHSTEN nehmen, damit der Pfad zum Goblin vor einem führt.
+				if (low.contains("goblin") && !low.contains("yolkar") && !low.contains("king")
+						&& !low.contains("slayer")) {
+					double d = sq(e.getX() - px) + sq(e.getY() - py) + sq(e.getZ() - pz);
+					if (d < goblinBestD) {
+						goblinBestD = d;
+						goblinBestPos = pos;
+					}
+				}
 				if (diag && en.length() > 2 && en.matches(".*[A-Za-z].*") && !en.startsWith("[")) {
 					names.append(" | ").append(en);
 				}
+			}
+			if (goblinBestPos != null) {
+				learned.put("Goblin Guard", goblinBestPos);
 			}
 			if (diag) {
 				lastDiagMs = now;
@@ -191,5 +207,9 @@ public final class CrystalNav {
 	public static double[] target() {
 		int[] p = targetPos;
 		return p == null ? null : new double[] { p[0], p[1], p[2] };
+	}
+
+	private static double sq(double v) {
+		return v * v;
 	}
 }

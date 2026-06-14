@@ -4,21 +4,23 @@ import java.util.Map;
 
 import com.midgard.Midgard;
 import com.midgard.events.config.ModConfig;
+import com.midgard.mining.CrystalMap;
 import com.midgard.mining.CrystalNav;
 import com.midgard.mining.MiningData;
 import com.midgard.render.MidgardText;
 import com.midgard.render.UIRenderer;
 
+import net.minecraft.block.MapColor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.map.MapState;
 
 /**
- * Kleine Mini-Karte für Crystal Hollows (oben rechts). CH ist prozedural, daher
- * liegen nur die MITTE (Crystal Nucleus, ~512/512) und der Jungle/Amethyst-
- * Quadrant (X/Z 201–512) fest – die anderen Quadranten wechseln pro Lobby.
- * Gezeigt werden also: Karten-Umriss + Quadranten, der feste Jungle-Bereich
- * (lila), der Nucleus, der Spieler mit Blickrichtung und alle bereits GELERNTEN
- * Punkte (z. B. King Yolkar) in ihrer Farbe – damit man die Richtung kennt.
+ * Mini-Karte für Crystal Hollows (oben rechts). Hält der Spieler die CH-KARTE,
+ * werden die ECHTEN Karten-Farben (Gebiete) gezeichnet ({@link CrystalMap}) plus
+ * die Karten-Marker und der Spieler – exakt über die Karten-Mitte/Skalierung.
+ * Ohne Karte gibt es eine einfache Ersatz-Ansicht (feste Mitte + Jungle-Quadrant
+ * + Spieler + gelernte Punkte) mit dem Hinweis, die Karte zu halten.
  */
 public final class MinimapHud {
 
@@ -28,10 +30,11 @@ public final class MinimapHud {
 	private static final int PANEL = 0xE6121218;
 	private static final int BORDER = 0x55FFFFFF;
 	private static final int GRID = 0x22FFFFFF;
-	private static final int JUNGLE = 0x33B050FF; // Amethyst-Quadrant (fest)
+	private static final int JUNGLE = 0x33B050FF;
 	private static final int NUCLEUS = 0xFFD06BFF;
 	private static final int AMBER = 0xFFF2A93B;
 	private static final int DIM = 0xFF8C8C97;
+	private static final int SIZE = 96;
 
 	private MinimapHud() {
 	}
@@ -45,55 +48,96 @@ public final class MinimapHud {
 		if (mc.player == null) {
 			return;
 		}
-		int size = 92;
 		int sw = mc.getWindow().getScaledWidth();
-		int x = sw - size - 6;
+		int x = sw - SIZE - 6;
 		int y = 6;
 
-		UIRenderer.fillRoundedRect(c, x - 1, y - 1, size + 2, size + 2, 4, BORDER);
-		UIRenderer.fillRoundedRect(c, x, y, size, size, 3, PANEL);
+		UIRenderer.fillRoundedRect(c, x - 1, y - 1, SIZE + 2, SIZE + 2, 4, BORDER);
+		UIRenderer.fillRoundedRect(c, x, y, SIZE, SIZE, 3, PANEL);
 
-		// Fester Jungle/Amethyst-Quadrant (NW: kleines X, kleines Z = oben links).
-		c.fill(x, y, x + size / 2, y + size / 2, JUNGLE);
-		// Quadranten-Linien + Mittelkreuz.
-		c.fill(x + size / 2, y, x + size / 2 + 1, y + size, GRID);
-		c.fill(x, y + size / 2, x + size, y + size / 2 + 1, GRID);
+		MapState ms = CrystalMap.state();
+		if (ms != null && ms.colors != null && ms.colors.length >= 128 * 128) {
+			renderFromMap(c, ms, x, y, mc);
+		} else {
+			renderFallback(c, x, y, mc);
+			txt(c, "Karte halten", x + 6, y + SIZE - 11, DIM, mc);
+		}
+	}
 
-		// Norden oben (-Z), kleine Beschriftung.
-		txt(c, "N", x + size / 2 - 2, y + 1, DIM, mc);
+	// ---- Variante MIT echter CH-Karte -------------------------------------
 
-		// Gelernte Punkte (inkl. Nucleus) als farbige Punkte.
+	private void renderFromMap(DrawContext c, MapState ms, int x, int y, MinecraftClient mc) {
+		int sc = 1 << ms.scale;
+		// Karten-Bild (128x128) in das Quadrat sampeln (2px-Schritte = schnell).
+		for (int j = 0; j < SIZE; j += 2) {
+			int pz = j * 128 / SIZE;
+			for (int i = 0; i < SIZE; i += 2) {
+				int px = i * 128 / SIZE;
+				int argb = MapColor.getRenderColor(ms.colors[pz * 128 + px] & 0xFF);
+				if ((argb >>> 24) == 0) {
+					continue; // unerforscht/transparent
+				}
+				c.fill(x + i, y + j, x + i + 2, y + j + 2, 0xFF000000 | (argb & 0xFFFFFF));
+			}
+		}
+		// Marker der Karte als Punkte (Name -> Farbe).
+		for (CrystalMap.Deco d : CrystalMap.decorations()) {
+			if (d.type().contains("player")) {
+				continue; // eigenen Pfeil zeichnen wir selbst
+			}
+			int sx = x + clamp(pix(d.x(), ms.centerX, sc)) * SIZE / 128;
+			int sy = y + clamp(pix(d.z(), ms.centerZ, sc)) * SIZE / 128;
+			dot(c, sx, sy, decoColor(d.name()));
+		}
+		// Spieler + Blickrichtung über die Karten-Mitte/Skalierung exakt platzieren.
+		int psx = x + clamp(pix(mc.player.getX(), ms.centerX, sc)) * SIZE / 128;
+		int psy = y + clamp(pix(mc.player.getZ(), ms.centerZ, sc)) * SIZE / 128;
+		drawPlayer(c, psx, psy, mc.player.getYaw());
+	}
+
+	private static int pix(double world, double center, int sc) {
+		return (int) Math.round((world - center) / sc + 64);
+	}
+
+	private static int clamp(int v) {
+		return v < 0 ? 0 : v > 127 ? 127 : v;
+	}
+
+	private static int decoColor(String name) {
+		String n = name.toLowerCase();
+		if (n.contains("yolkar") || n.contains("goblin")) {
+			return AMBER;
+		}
+		if (n.contains("nucleus")) {
+			return NUCLEUS;
+		}
+		return 0xFFFFE070;
+	}
+
+	// ---- Ersatz OHNE Karte ------------------------------------------------
+
+	private void renderFallback(DrawContext c, int x, int y, MinecraftClient mc) {
+		c.fill(x, y, x + SIZE / 2, y + SIZE / 2, JUNGLE); // Jungle/Amethyst (fest, NW)
+		c.fill(x + SIZE / 2, y, x + SIZE / 2 + 1, y + SIZE, GRID);
+		c.fill(x, y + SIZE / 2, x + SIZE, y + SIZE / 2 + 1, GRID);
+		txt(c, "N", x + SIZE / 2 - 2, y + 1, DIM, mc);
 		for (Map.Entry<String, int[]> e : CrystalNav.learnedView().entrySet()) {
 			int[] p = e.getValue();
-			int px = mapX(x, size, p[0]);
-			int py = mapZ(y, size, p[2]);
-			int col = colorFor(e.getKey());
-			c.fill(px - 2, py - 2, px + 3, py + 3, 0xFF000000);
-			c.fill(px - 1, py - 1, px + 2, py + 2, col);
+			dot(c, mapX(x, p[0]), mapZ(y, p[2]), colorFor(e.getKey()));
 		}
-
-		// Spieler + Blickrichtung (weißer Pfeil).
-		int psx = mapX(x, size, mc.player.getX());
-		int psy = mapZ(y, size, mc.player.getZ());
-		double rad = Math.toRadians(mc.player.getYaw());
-		double dirx = -Math.sin(rad), dirz = Math.cos(rad); // Welt-Blickrichtung
-		int tipx = psx + (int) Math.round(dirx * 7);
-		int tipy = psy + (int) Math.round(dirz * 7);
-		line(c, psx, psy, tipx, tipy, 0xFFFFFFFF);
-		c.fill(psx - 2, psy - 2, psx + 3, psy + 3, 0xFF000000);
-		c.fill(psx - 1, psy - 1, psx + 2, psy + 2, 0xFFFFFFFF);
+		drawPlayer(c, mapX(x, mc.player.getX()), mapZ(y, mc.player.getZ()), mc.player.getYaw());
 	}
 
-	private static int mapX(int x, int size, double wx) {
+	private static int mapX(int x, double wx) {
 		double t = (wx - MIN) / RANGE;
 		t = t < 0 ? 0 : t > 1 ? 1 : t;
-		return x + (int) Math.round(t * size);
+		return x + (int) Math.round(t * SIZE);
 	}
 
-	private static int mapZ(int y, int size, double wz) {
+	private static int mapZ(int y, double wz) {
 		double t = (wz - MIN) / RANGE;
 		t = t < 0 ? 0 : t > 1 ? 1 : t;
-		return y + (int) Math.round(t * size);
+		return y + (int) Math.round(t * SIZE);
 	}
 
 	private static int colorFor(String name) {
@@ -106,7 +150,23 @@ public final class MinimapHud {
 		return 0xFF5BE36B;
 	}
 
-	/** Dünne Linie (Bresenham-artig) für den Richtungspfeil. */
+	// ---- gemeinsame Helfer ------------------------------------------------
+
+	private static void dot(DrawContext c, int px, int py, int col) {
+		c.fill(px - 2, py - 2, px + 3, py + 3, 0xFF000000);
+		c.fill(px - 1, py - 1, px + 2, py + 2, col);
+	}
+
+	private void drawPlayer(DrawContext c, int psx, int psy, float yaw) {
+		double rad = Math.toRadians(yaw);
+		double dirx = -Math.sin(rad), dirz = Math.cos(rad);
+		int tipx = psx + (int) Math.round(dirx * 7);
+		int tipy = psy + (int) Math.round(dirz * 7);
+		line(c, psx, psy, tipx, tipy, 0xFFFFFFFF);
+		c.fill(psx - 2, psy - 2, psx + 3, psy + 3, 0xFF000000);
+		c.fill(psx - 1, psy - 1, psx + 2, psy + 2, 0xFFFFFFFF);
+	}
+
 	private static void line(DrawContext c, int x1, int y1, int x2, int y2, int color) {
 		int steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
 		if (steps <= 0) {

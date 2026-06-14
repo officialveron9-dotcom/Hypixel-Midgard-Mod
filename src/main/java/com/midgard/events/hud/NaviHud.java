@@ -58,6 +58,14 @@ public final class NaviHud {
 		if (!MiningData.INSTANCE.onMiningIsland) {
 			return e;
 		}
+		// Oben: Umschalter Pfad am Boden / durch die Luft (cfg.pathTeleport).
+		boolean air = Midgard.config != null && Midgard.config.pathTeleport;
+		e.add(new Entry(air ? "Pfad: ✈ Luft" : "Pfad: ⛏ Boden", HEADER, true, () -> {
+			if (Midgard.config != null) {
+				Midgard.config.pathTeleport = !Midgard.config.pathTeleport;
+				Midgard.config.save();
+			}
+		}));
 		e.add(new Entry("Fadenkreuz-Ziel", TEXT, true, NaviHud::targetLookedAt));
 		if (MiningData.INSTANCE.onCrystalHollows) {
 			// Mitte (funktioniert) + Amber-Crystal-Test (King Yolkar, Goblin Guard).

@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15b (3D-Marker statt 2D, Editor-Trennlinie+Zurueck unten, CH-Minimap)");
+		System.out.println("[Midgard] init build=2026-06-15c (CH-Karte auslesen: Minimap-Farben+Marker, Pfad-Prio-Fix, Goblin-Erkennung, Ground/Air-Schalter)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -170,17 +170,25 @@ public class Midgard implements ClientModInitializer {
 				com.midgard.mining.MiningWaypoints.tick(client);
 				com.midgard.mining.CrystalNav.tick(client);
 				com.midgard.mining.CrystalData.INSTANCE.update(client);
-				// Wegfinder: gewähltes Navi-Ziel (Crystal Hollows) hat Vorrang,
-				// sonst der nächste automatische Wegpunkt.
+				com.midgard.mining.CrystalMap.tick(client);
+				// Wegfinder: ist in Crystal Hollows ein Ziel GEWÄHLT, zählt NUR dieses
+				// (auch wenn es noch gesucht wird -> dann KEIN Pfad, statt zur Mitte).
+				// Sonst der nächste automatische Wegpunkt.
 				if (config.miningPathLine) {
-					double[] nav = com.midgard.mining.CrystalNav.target();
-					com.midgard.util.Waypoints.Marker tgt = com.midgard.mining.MiningWaypoints.nearest();
-					if (nav != null) {
-						com.midgard.util.PathFinder.update(nav[0], nav[1], nav[2], config.pathTeleport);
-					} else if (tgt != null) {
-						com.midgard.util.PathFinder.update(tgt.x(), tgt.y(), tgt.z(), config.pathTeleport);
+					if (com.midgard.mining.CrystalNav.hasTarget()) {
+						double[] nav = com.midgard.mining.CrystalNav.target();
+						if (nav != null) {
+							com.midgard.util.PathFinder.update(nav[0], nav[1], nav[2], config.pathTeleport);
+						} else {
+							com.midgard.util.PathFinder.clear(); // gewählt, aber noch in Suche
+						}
 					} else {
-						com.midgard.util.PathFinder.clear();
+						com.midgard.util.Waypoints.Marker tgt = com.midgard.mining.MiningWaypoints.nearest();
+						if (tgt != null) {
+							com.midgard.util.PathFinder.update(tgt.x(), tgt.y(), tgt.z(), config.pathTeleport);
+						} else {
+							com.midgard.util.PathFinder.clear();
+						}
 					}
 				} else {
 					com.midgard.util.PathFinder.clear();
