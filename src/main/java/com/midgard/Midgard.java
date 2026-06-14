@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15w (Pathfinder findet Hoehen-Umwege besser: mehr Budget + zielstrebiger; PathCalc-Diagnose ob Ziel erreicht)");
+		System.out.println("[Midgard] init build=2026-06-15x (Navi nur noch zu ECHT gefundenen NPCs - keine erfundenen Approx-Koordinaten mehr; kein Random-Ziel/Wand)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

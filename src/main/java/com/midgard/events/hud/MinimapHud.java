@@ -174,19 +174,8 @@ public final class MinimapHud {
 		c.fill(x, y + half, x + SIZE, y + half + 1, 0x22FFFFFF);
 		txt(c, "N", x + half - 2, y + 1, DIM, mc);
 
-		// Vorab: noch nicht gelernte Kristall-Gebiete BLASS anzeigen (Richtung
-		// schon sichtbar, ohne dass man dort gewesen sein muss).
+		// NUR echte, per Name gefundene Orte anzeigen (keine Schätzungen mehr).
 		Map<String, int[]> learnedM = CrystalNav.learnedView();
-		for (CrystalNav.CrystalArea ca : CrystalNav.CRYSTALS) {
-			if (ca.locations().isEmpty() || learnedM.containsKey(ca.locations().get(0))) {
-				continue;
-			}
-			int[] ap = CrystalNav.approxOf(ca.locations().get(0));
-			if (ap != null) {
-				fadedDot(c, mapX(x, ap[0]), mapZ(y, ap[2]), ca.color());
-			}
-		}
-		// Gelernte Punkte VOLL (in Gem-Farbe).
 		for (Map.Entry<String, int[]> e : learnedM.entrySet()) {
 			int[] p = e.getValue();
 			dot(c, mapX(x, p[0]), mapZ(y, p[2]), colorFor(e.getKey()));
@@ -194,11 +183,6 @@ public final class MinimapHud {
 		drawPlayer(c, mapX(x, mc.player.getX()), mapZ(y, mc.player.getZ()), mc.player.getYaw());
 	}
 
-	/** Blasser Vorab-Punkt für ein noch nicht besuchtes Gebiet. */
-	private static void fadedDot(DrawContext c, int px, int py, int col) {
-		c.fill(px - 2, py - 2, px + 3, py + 3, 0x44000000);
-		c.fill(px - 1, py - 1, px + 2, py + 2, (col & 0xFFFFFF) | 0x77000000);
-	}
 
 	private static int mapX(int x, double wx) {
 		double t = (wx - MIN) / RANGE;

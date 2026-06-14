@@ -130,7 +130,7 @@ public final class MiningWaypoints {
 			double[] nav = CrystalNav.target();
 			if (nav != null) {
 				out.add(new Marker(nav[0], nav[1], nav[2], CrystalNav.targetName(), NUCLEUS_COLOR));
-			} else {
+			} else if (!CrystalNav.hasTarget()) {
 				out.add(new Marker(NUCLEUS[0], NUCLEUS[1], NUCLEUS[2], "Crystal Nucleus", NUCLEUS_COLOR));
 			}
 		}

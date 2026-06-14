@@ -71,23 +71,6 @@ public final class CrystalNav {
 
 	private static final int[] NUCLEUS = { 513, 125, 513 };
 
-	/**
-	 * Ungefähre Gebiets-Mitte je NPC, SOLANGE er noch nicht geladen ist – nur als
-	 * Richtungshinweis. Crystal Hollows liegt grob als Kreuz um die Mitte (512):
-	 * Mithril = Nord (Z&lt;512), Goblin = Süd (Z&gt;512), Jungle = West (X&lt;512),
-	 * Precursor = Ost (X&gt;512). Sobald der NPC in der Nähe lädt, zählt die exakte
-	 * Position. (Goblin-Süd bestätigt über Amber-Spawn ~511/703.)
-	 */
-	private static final Map<String, int[]> APPROX = Map.ofEntries(
-			Map.entry("King Yolkar", new int[] { 500, 130, 690 }),            // Süd (Goblin)
-			Map.entry("Kalhuiki Door Guardian", new int[] { 330, 130, 512 }), // West (Jungle)
-			Map.entry("Professor Robot", new int[] { 700, 130, 512 }),        // Ost (Precursor)
-			Map.entry("Keeper of Diamond", new int[] { 480, 130, 330 }),      // Nord (Mithril)
-			Map.entry("Keeper of Emerald", new int[] { 520, 130, 330 }),
-			Map.entry("Keeper of Lapis", new int[] { 540, 130, 350 }),
-			Map.entry("Keeper of Gold", new int[] { 500, 130, 350 }),
-			Map.entry("Bal", new int[] { 469, 81, 383 }));                    // Magma (Khazad-dûm)
-
 	private static final Map<String, int[]> learned = new HashMap<>();
 	private static volatile String targetName;
 	private static volatile int[] targetPos;
@@ -218,11 +201,6 @@ public final class CrystalNav {
 		return new HashMap<>(learned);
 	}
 
-	/** Ungefähre Gebiets-Position eines Ortes (für Vorab-Anzeige), sonst null. */
-	public static int[] approxOf(String name) {
-		int[] a = APPROX.get(name);
-		return a == null ? null : a.clone();
-	}
 
 	/** Ziel wählen – auch wenn der NPC noch nicht gefunden ist (Pending). Sobald
 	 *  er in der Nähe geladen wird, startet die Navigation automatisch. */
@@ -250,26 +228,20 @@ public final class CrystalNav {
 		return targetName;
 	}
 
-	/** Zielkoordinate {x,y,z}: exakt (gelernt) oder ungefähr (Gebiet), sonst null. */
+	/**
+	 * Zielkoordinate {x,y,z} – NUR wenn der NPC per Name wirklich gefunden wurde,
+	 * sonst {@code null}. KEINE erfundenen Näherungs-Koordinaten mehr (die führten
+	 * random / in Wände). Nicht gefunden = kein Pfad, kein Marker.
+	 */
 	public static double[] target() {
 		int[] p = targetPos;
 		if (p != null) {
 			return new double[] { p[0], p[1], p[2] }; // exakt (NPC geladen)
 		}
-		if (targetName != null) {
-			int[] ap = APPROX.get(targetName);
-			if (ap != null) {
-				// Ungefähr: XZ vom Gebiet, aber Y vom SPIELER -> der Pfad bleibt am
-				// Boden Richtung Gebiet, statt zu einem hohen Punkt hochzufliegen.
-				MinecraftClient mc = MinecraftClient.getInstance();
-				double py = mc.player != null ? mc.player.getY() : ap[1];
-				return new double[] { ap[0], py, ap[2] };
-			}
-		}
-		return null;
+		return null; // gewählt, aber noch nicht in der Nähe gesehen -> nichts anzeigen
 	}
 
-	/** Ist die Zielposition EXAKT bekannt (NPC geladen)? Sonst nur ungefähr. */
+	/** Ist die Zielposition EXAKT bekannt (NPC geladen)? */
 	public static boolean targetExact() {
 		return targetPos != null;
 	}
