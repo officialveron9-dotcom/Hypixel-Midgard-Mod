@@ -3,6 +3,7 @@ package com.midgard.events.config;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,12 @@ public class ModConfig {
 	public boolean showPrices = true;
 	/** Zahlen kürzen (500.000.000 -> 500kk); aus = immer volle Zahl. */
 	public boolean compactNumbers = false;
+	/** Eigene Auktions-Suche (statt Hypixel-Schild) beim Klick auf AH-Suche. */
+	public boolean auctionSearch = true;
+	/** Verlauf der letzten Auktions-Suchen (neueste zuerst). */
+	public List<String> auctionHistory = new ArrayList<>();
+	/** Zuletzt gewählter Sterne-Filter der Auktions-Suche (0-10, rein lokal). */
+	public int auctionStars = 0;
 	/** Eigene Statusleisten: Leben links, XP mittig, Mana rechts (Text innen). */
 	public boolean customBars = true;
 	/** Borderless-Vollbild: randloses Fenster in Monitorgröße (Alt-Tab ohne Minimieren). */
@@ -271,6 +278,9 @@ public class ModConfig {
 					}
 					if (cfg.globalFontName == null) {
 						cfg.globalFontName = "";
+					}
+					if (cfg.auctionHistory == null) {
+						cfg.auctionHistory = new ArrayList<>();
 					}
 					return cfg;
 				}

@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15x (Navi nur noch zu ECHT gefundenen NPCs - keine erfundenen Approx-Koordinaten mehr; kein Random-Ziel/Wand)");
+		System.out.println("[Midgard] init build=2026-06-15y (Auktions-Suche: eigenes Menue statt Hypixel-Schild - Live-Vorschlaege, Verlauf, Sterne)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -55,6 +55,11 @@ public class Midgard implements ClientModInitializer {
 
 		// Bazaar-/AH-Preise im Item-Tooltip (ausschließlich vom eigenen Backend).
 		com.midgard.price.PriceTooltips.register();
+
+		// Eigene Auktions-Suche: das Hypixel-Such-Schild durch ein eigenes Menü
+		// ersetzen (Live-Vorschläge, Verlauf, Sterne). Item-Liste vorwärmen.
+		com.midgard.auction.AuctionSearchHook.register();
+		com.midgard.auction.ItemIndex.INSTANCE.ensureLoaded();
 
 		// Tastenkürzel. Die Keybind-Kategorie ist seit 1.21.6 ein Objekt.
 		KeyBinding.Category category =

@@ -353,6 +353,12 @@ public class ConfigScreen extends Screen {
 	}
 
 	private void buildAuctionRows(List<Row> out, DrawContext context, int mouseX, int mouseY, int cardX, int cardW) {
+		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("election"),
+				"Eigene Auktions-Suche", "Ersetzt das Hypixel-Such-Schild durch ein eigenes Menü mit Live-Vorschlägen, Verlauf und Sternen.",
+				() -> cfg.auctionSearch, () -> {
+					cfg.auctionSearch = !cfg.auctionSearch;
+					cfg.save();
+				}));
 		out.add(toggleRow(context, mouseX, mouseY, cardX, cardW, pngIcon("gem"),
 				"Preise anzeigen", "Bazaar- und AH-Preise im Item-Tooltip.",
 				() -> cfg.showPrices, () -> {
