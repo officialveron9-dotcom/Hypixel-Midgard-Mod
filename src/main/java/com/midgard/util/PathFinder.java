@@ -23,7 +23,10 @@ import net.minecraft.util.math.Vec3d;
 public final class PathFinder {
 
 	private static final int MAX_EXPAND = 7000;
-	private static final long RECalc_MS = 600;
+	/** Mindestabstand (Blöcke), den man sich bewegen muss, bevor neu gerechnet wird. */
+	private static final int MOVE_THRESHOLD = 5;
+	/** Sonst nur alle paar Sekunden neu rechnen (kein Geflacker pro Meter). */
+	private static final long RECalc_MS = 2500;
 
 	private static volatile List<Vec3d> path = List.of();
 	private static BlockPos lastStart;
@@ -64,9 +67,11 @@ public final class PathFinder {
 		}
 
 		long now = System.currentTimeMillis();
-		boolean moved = lastStart == null || lastGoal == null
-				|| start.getManhattanDistance(lastStart) > 1 || !goal.equals(lastGoal);
-		if (!moved && now - lastCalcMs < RECalc_MS && !path.isEmpty()) {
+		boolean goalChanged = lastGoal == null || !goal.equals(lastGoal);
+		boolean movedFar = lastStart == null || start.getManhattanDistance(lastStart) > MOVE_THRESHOLD;
+		// Ziel gewechselt -> sofort neu; sonst nur bei großem Schritt ODER nach
+		// langer Zeit (kein Neuberechnen wegen ein paar Metern).
+		if (!goalChanged && !movedFar && now - lastCalcMs < RECalc_MS && !path.isEmpty()) {
 			return;
 		}
 		lastStart = start;

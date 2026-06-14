@@ -3,7 +3,6 @@ package com.midgard.util;
 import java.util.List;
 
 import com.midgard.render.MidgardText;
-import com.midgard.render.UIRenderer;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -95,34 +94,53 @@ public final class Waypoints {
 				if (s == null) {
 					continue;
 				}
-				marker(context, s[0], s[1], m.color());
 				double dist = Math.sqrt(sq(m.x() + 0.5 - p.eye.x) + sq(m.y() - p.eye.y) + sq(m.z() + 0.5 - p.eye.z));
-				String label = m.label() + "  " + Math.round(dist) + "m";
-				int tw = textW(label);
-				int lx = Math.max(2, Math.min(p.w - tw - 2, s[0] - tw / 2));
-				int ly = s[1] - capH() - 10;
-				// Abgerundeter dunkler Hintergrund hinter dem Text.
-				UIRenderer.fillRoundedRect(context, lx - 4, ly - 3, tw + 8, capH() + 6, 3, 0xC0000010);
-				text(context, label, lx, ly, m.color());
+				// Entfernungsabhängige Größe (wie Skyblocker): nah groß, fern klein.
+				float sc = (float) Math.max(0.6, Math.min(2.0, 22.0 / Math.max(4.0, dist)));
+				float fs = 8f * sc;
+				int rad = Math.max(2, Math.round(4 * sc));
+
+				marker(context, s[0], s[1], m.color(), rad);
+
+				// Zwei Zeilen OHNE Hintergrund: Name oben, Entfernung darunter.
+				int lineH = Math.round(fs) + 2;
+				int distY = s[1] - rad - 4 - lineH;
+				int nameY = distY - lineH;
+				labelLine(context, m.label(), s[0], nameY, fs, m.color());
+				labelLine(context, Math.round(dist) + "m", s[0], distY, fs, 0xFFE9E9EE);
 			} catch (Throwable ignored) {
 				// einzelner Marker darf nie alles abreißen
 			}
 		}
 	}
 
-	/** Ziel-Marker: dunkel umrandeter Diamant mit kleinem Glanz – gut sichtbar. */
-	private static void marker(DrawContext c, int cx, int cy, int color) {
-		// dunkler Rand (eine Stufe größer)
-		for (int i = 0; i <= 5; i++) {
-			c.fill(cx - (5 - i), cy - i, cx + (5 - i) + 1, cy - i + 1, 0xC0000000);
-			c.fill(cx - (5 - i), cy + i, cx + (5 - i) + 1, cy + i + 1, 0xC0000000);
+	/** Zentrierter Text mit Schatten (kein Hintergrund), in beliebiger Größe. */
+	private static void labelLine(DrawContext c, String s, int cx, int yTop, float size, int color) {
+		int w = MidgardText.width(s, size, true);
+		if (w < 0) {
+			w = MinecraftClient.getInstance().textRenderer.getWidth(s);
 		}
-		// farbige Füllung
-		for (int i = 0; i <= 4; i++) {
-			c.fill(cx - (4 - i), cy - i, cx + (4 - i) + 1, cy - i + 1, color);
-			c.fill(cx - (4 - i), cy + i, cx + (4 - i) + 1, cy + i + 1, color);
+		int x = cx - w / 2;
+		boolean ok = MidgardText.draw(c, s, x + 1, yTop + 1, size, 0xD0000000, true);
+		MidgardText.draw(c, s, x, yTop, size, color, true);
+		if (!ok) {
+			c.drawText(MinecraftClient.getInstance().textRenderer, s, x, yTop, color, true);
 		}
-		// kleiner heller Punkt in der Mitte
+	}
+
+	/** Ziel-Marker: dunkel umrandeter Diamant mit hellem Kern, Radius skalierbar. */
+	private static void marker(DrawContext c, int cx, int cy, int color, int rad) {
+		int outer = rad + 1;
+		for (int i = 0; i <= outer; i++) {
+			int hw = outer - i;
+			c.fill(cx - hw, cy - i, cx + hw + 1, cy - i + 1, 0xC0000000);
+			c.fill(cx - hw, cy + i, cx + hw + 1, cy + i + 1, 0xC0000000);
+		}
+		for (int i = 0; i <= rad; i++) {
+			int hw = rad - i;
+			c.fill(cx - hw, cy - i, cx + hw + 1, cy - i + 1, color);
+			c.fill(cx - hw, cy + i, cx + hw + 1, cy + i + 1, color);
+		}
 		c.fill(cx - 1, cy - 1, cx + 1, cy + 1, 0xFFFFFFFF);
 	}
 

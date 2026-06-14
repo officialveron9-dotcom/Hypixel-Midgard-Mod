@@ -70,52 +70,50 @@ public final class MiningWaypoints {
 				break;
 			}
 		}
-		boolean emissaries = comWp && anyDone;
-
 		List<Marker> out = new ArrayList<>();
 
-		// Gebiets-Wegpunkte für AKTIVE Commissions (ungefähre Dwarven-Koordinaten).
+		// Commission-Wegpunkte je Gebiet: AKTIV -> Abbau-Gebiet, FERTIG -> der
+		// Emissär dieses Gebiets (Abgabe). Jedes Gebiet hat seinen eigenen.
 		if (comWp) {
 			for (MiningData.Commission c : MiningData.INSTANCE.commissions) {
-				if (c.done()) {
+				Area a = areaFor(c.name());
+				if (a == null) {
 					continue;
 				}
-				Area a = areaFor(c.name());
-				if (a != null) {
-					out.add(new Marker(a.x(), a.y(), a.z(), c.name() + " (ca.)", AREA_COLOR));
+				if (c.done()) {
+					out.add(new Marker(a.x(), a.y(), a.z(), c.name() + " abgeben", EMISSARY_COLOR));
+				} else {
+					out.add(new Marker(a.x(), a.y(), a.z(), c.name(), AREA_COLOR));
 				}
 			}
 		}
 
-		if (!mobs && !emissaries && out.isEmpty()) {
+		if (!mobs && out.isEmpty()) {
 			cached = List.of();
 			return;
 		}
 
+		// Goblins/Golems live aus den Entities (Cluster am ungefähren Spawn).
 		List<double[]> goblins = new ArrayList<>();
 		List<double[]> golems = new ArrayList<>();
-
-		int scanned = 0;
-		for (Entity e : (mobs || emissaries) ? mc.world.getEntities() : java.util.List.<Entity>of()) {
-			if (scanned++ > 400) {
-				break;
-			}
-			if (e.getName() == null) {
-				continue;
-			}
-			String low = e.getName().getString().toLowerCase(Locale.ROOT);
-			double[] pos = { e.getX(), e.getY(), e.getZ() };
-			if (mobs && low.contains("goblin") && !low.contains("slayer")) {
-				goblins.add(pos);
-			} else if (mobs && (low.contains("golem") || low.contains("walker"))) {
-				golems.add(pos);
-			} else if (emissaries && low.contains("emissary")) {
-				// Emissäre sind einzelne, weit verteilte NPCs -> jeder eigen.
-				out.add(new Marker(pos[0], pos[1], pos[2], e.getName().getString(), EMISSARY_COLOR));
+		if (mobs) {
+			int scanned = 0;
+			for (Entity e : mc.world.getEntities()) {
+				if (scanned++ > 400) {
+					break;
+				}
+				if (e.getName() == null) {
+					continue;
+				}
+				String low = e.getName().getString().toLowerCase(Locale.ROOT);
+				double[] pos = { e.getX(), e.getY(), e.getZ() };
+				if (low.contains("goblin") && !low.contains("slayer")) {
+					goblins.add(pos);
+				} else if (low.contains("golem") || low.contains("walker")) {
+					golems.add(pos);
+				}
 			}
 		}
-
-		// Mobs zu ungefähren Spawn-Markern zusammenfassen.
 		cluster(goblins, "Goblins", out);
 		cluster(golems, "Golems", out);
 		cached = out;
