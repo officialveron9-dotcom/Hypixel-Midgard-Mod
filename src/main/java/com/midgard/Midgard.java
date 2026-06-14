@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15m (Text groesser+lesbar, Beam weg, Linie folgt enger dem Boden)");
+		System.out.println("[Midgard] init build=2026-06-15n (TIEFEN-LAYER-FIX: Pfad nicht mehr durch Waende! + Goblin-Erkennung im Goblin-Gebiet)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

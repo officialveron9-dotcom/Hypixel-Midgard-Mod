@@ -36,7 +36,7 @@ public final class MidgardLayers {
 				// Aus dem vanilla POSITION_COLOR-Snippet ableiten (bringt Shader +
 				// alle nötigen Uniforms mit) und nur Tiefentest/Blend/Format ändern.
 				RenderPipeline pipeline = RenderPipeline.builder(RenderPipelines.POSITION_COLOR_SNIPPET)
-						.withLocation("midgard:pipeline/path_filled_depth")
+						.withLocation("pipeline/midgard_path_filled")
 						.withVertexFormat(VertexFormats.POSITION_COLOR, VertexFormat.DrawMode.QUADS)
 						.withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
 						.withDepthWrite(false)

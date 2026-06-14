@@ -78,12 +78,21 @@ public final class CrystalNav {
 		if (mc.player == null) {
 			return;
 		}
+		// Im Goblin-Gebiet (Scoreboard) zählen die Goblin-Mobs (heißen z. B.
+		// "Weakling") als "Goblin Guard" – aber NUR dort, damit nicht irgendein
+		// Goblin woanders matcht.
+		String area = ScoreboardReader.currentArea(mc);
+		boolean inGoblinArea = area != null && area.toLowerCase(Locale.ROOT).contains("goblin");
+
 		// Benannte NPCs in der Nähe erkennen und ihre Position lernen.
 		if (mc.world != null) {
 			long now = System.currentTimeMillis();
 			boolean diag = now - lastDiagMs > 20_000;
 			StringBuilder names = diag ? new StringBuilder() : null;
 			int scanned = 0;
+			double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
+			double goblinBestD = Double.MAX_VALUE;
+			int[] goblinBestPos = null;
 			for (Entity e : mc.world.getEntities()) {
 				if (scanned++ > 300 || e.getName() == null) {
 					continue;
@@ -103,13 +112,27 @@ public final class CrystalNav {
 						learned.put(e2.getValue(), pos);
 					}
 				}
+				// Goblin-Mobs im Goblin-Gebiet -> nächsten als "Goblin Guard" merken.
+				if (inGoblinArea && (low.contains("goblin") || low.contains("weakling")
+						|| low.contains("knifethrower") || low.contains("battlehardened"))
+						&& !low.contains("yolkar") && !low.contains("king")) {
+					double d = (e.getX() - px) * (e.getX() - px) + (e.getY() - py) * (e.getY() - py)
+							+ (e.getZ() - pz) * (e.getZ() - pz);
+					if (d < goblinBestD) {
+						goblinBestD = d;
+						goblinBestPos = pos;
+					}
+				}
 				if (diag && en.length() > 2 && en.matches(".*[A-Za-z].*") && !en.startsWith("[")) {
 					names.append(" | ").append(en);
 				}
 			}
+			if (goblinBestPos != null) {
+				learned.put("Goblin Guard", goblinBestPos);
+			}
 			if (diag) {
 				lastDiagMs = now;
-				System.out.println("[Midgard] CH-Entities:" + names);
+				System.out.println("[Midgard] CH-Entities (Gebiet=" + area + "):" + names);
 			}
 		}
 		// Pending-Ziel: sobald der gewählte NPC geladen/gelernt ist, Position
