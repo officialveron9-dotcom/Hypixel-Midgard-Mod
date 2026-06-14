@@ -22,9 +22,12 @@ import net.minecraft.util.math.Vec3d;
  */
 public final class PathFinder {
 
-	private static final int MAX_EXPAND = 5000;
-	/** Hartes Zeitbudget pro Berechnung – kappt jeden Ruckler (≈ ein halber Frame). */
-	private static final long BUDGET_NS = 5_000_000;
+	private static final int MAX_EXPAND = 9000;
+	/** Hartes Zeitbudget pro Berechnung – kappt jeden Ruckler. */
+	private static final long BUDGET_NS = 7_000_000;
+	/** Heuristik-Gewicht (>1 = zielstrebiger, findet einen Weg schneller, ggf. nicht
+	 *  der allerkürzeste – aber er erreicht das Ziel eher innerhalb des Budgets). */
+	private static final double H_WEIGHT = 1.3;
 	/** Mindestabstand (Blöcke), den man sich bewegen muss, bevor neu gerechnet wird. */
 	private static final int MOVE_THRESHOLD = 8;
 	/** Sonst nur selten neu rechnen (Linie bleibt ruhig stehen). */
@@ -34,6 +37,12 @@ public final class PathFinder {
 	private static BlockPos lastStart;
 	private static BlockPos lastGoal;
 	private static long lastCalcMs = 0;
+
+	// Diagnose des letzten A*-Laufs (fürs Log).
+	private static boolean diagReached;
+	private static boolean diagBudgetHit;
+	private static int diagExpand;
+	private static double diagBestH;
 
 	/** 4 Himmelsrichtungen (für senkrechte Loch-Auf-/Abstiege). */
 	private static final int[] HX = { 1, -1, 0, 0 };
@@ -100,6 +109,10 @@ public final class PathFinder {
 		} else if (goalChanged) {
 			path = List.of();
 		}
+		// Diagnose (nur bei echter Neuberechnung, also gedrosselt): hat A* das Ziel
+		// WIRKLICH erreicht oder nur abgebrochen? -> zeigt, ob der Höhen-Umweg fehlt.
+		System.out.println("[Midgard] PathCalc Ziel-erreicht=" + diagReached + " Budget-aus=" + diagBudgetHit
+				+ " Knoten=" + diagExpand + " RestDistanz=" + Math.round(diagBestH) + " Punkte=" + path.size());
 	}
 
 	// ---- A* ---------------------------------------------------------------
@@ -128,15 +141,17 @@ public final class PathFinder {
 		PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Double.compare(a.f, b.f));
 		Map<Long, Double> best = new HashMap<>();
 		Map<Long, BlockPos> came = new HashMap<>();
-		open.add(new Node(s, 0, heur(s, target)));
+		open.add(new Node(s, 0, H_WEIGHT * heur(s, target)));
 		best.put(s.asLong(), 0.0);
 		BlockPos bestNode = s;
 		double bestH = heur(s, target);
 		int expand = 0;
+		diagBudgetHit = false;
 
 		while (!open.isEmpty() && expand++ < MAX_EXPAND) {
 			// Harte Zeitgrenze: lieber ein Teilweg als ein Frame-Ruckler.
 			if ((expand & 255) == 0 && System.nanoTime() > deadline) {
+				diagBudgetHit = true;
 				break;
 			}
 			Node cur = open.poll();
@@ -147,6 +162,9 @@ public final class PathFinder {
 				bestNode = cp;
 			}
 			if (cp.isWithinDistance(target, 1.6)) {
+				diagReached = true;
+				diagExpand = expand;
+				diagBestH = 0;
 				return build(world, came, cp, s);
 			}
 			Double bg = best.get(cp.asLong());
@@ -218,6 +236,9 @@ public final class PathFinder {
 		// Kein voller Weg gefunden -> Teilweg bis zum nächstgelegenen Punkt
 		// (folgt dem Boden). Kommt man horizontal NICHT voran (eingeschlossen),
 		// nach OBEN auf einen offenen Schacht zeigen, statt durch die Wand.
+		diagReached = false;
+		diagExpand = expand;
+		diagBestH = bestH;
 		return bestNode.equals(s) ? verticalEscape(world, s) : build(world, came, bestNode, s);
 	}
 
@@ -257,7 +278,7 @@ public final class PathFinder {
 		if (old == null || ng < old - 1e-3) {
 			best.put(key, ng);
 			came.put(key, from);
-			open.add(new Node(np, ng, ng + heur(np, target)));
+			open.add(new Node(np, ng, ng + H_WEIGHT * heur(np, target)));
 		}
 	}
 

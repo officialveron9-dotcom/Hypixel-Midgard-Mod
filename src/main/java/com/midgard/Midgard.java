@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-15v (Diagnose: PathDbg-Log zaehlt gezeichnet/verdeckt/imBlock - zur Fehlersuche durch-Wand)");
+		System.out.println("[Midgard] init build=2026-06-15w (Pathfinder findet Hoehen-Umwege besser: mehr Budget + zielstrebiger; PathCalc-Diagnose ob Ziel erreicht)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
