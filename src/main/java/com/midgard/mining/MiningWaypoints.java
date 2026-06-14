@@ -22,6 +22,9 @@ public final class MiningWaypoints {
 	private static final int MOB_COLOR = 0xFF5BE36B;
 	private static final int EMISSARY_COLOR = 0xFFFFC85C;
 	private static final int AREA_COLOR = 0xFF4DA6FF;
+	private static final int NUCLEUS_COLOR = 0xFFD06BFF;
+	/** Crystal Nucleus liegt IMMER in der Mitte von Crystal Hollows (fest). */
+	private static final int[] NUCLEUS = { 513, 125, 513 };
 	/** Horizontaler Radius (Blöcke), innerhalb dessen Mobs zu einem Cluster gehören. */
 	private static final double CLUSTER_R = 16.0;
 
@@ -64,6 +67,11 @@ public final class MiningWaypoints {
 		boolean mobs = Midgard.config.miningGoblinWaypoints;
 		boolean comWp = Midgard.config.miningCommissionWaypoints;
 		List<Marker> out = new ArrayList<>();
+
+		// Crystal Hollows: Wegpunkt zur Mitte (Crystal Nucleus, feste Koordinate).
+		if (comWp && MiningData.INSTANCE.onCrystalHollows) {
+			out.add(new Marker(NUCLEUS[0], NUCLEUS[1], NUCLEUS[2], "Crystal Nucleus", NUCLEUS_COLOR));
+		}
 
 		// Entities einmal scannen: Goblins/Golems (für Mobs) UND Emissäre (um
 		// den Commission-Wegpunkt genau auf die Emissär-Person zu legen).

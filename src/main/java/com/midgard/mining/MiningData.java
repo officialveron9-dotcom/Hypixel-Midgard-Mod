@@ -45,6 +45,8 @@ public class MiningData {
 	private static final Pattern GLACITE = Pattern.compile("(?i)Glacite(?:\\s*Powder)?:\\s*([\\d.,]+)");
 
 	public volatile boolean onMiningIsland = false;
+	/** Speziell auf Crystal Hollows (für den Nucleus-Wegpunkt). */
+	public volatile boolean onCrystalHollows = false;
 	public volatile List<Commission> commissions = List.of();
 	/** Powder-Stände ("-" = nicht gefunden). */
 	public volatile String mithril = "";
@@ -92,14 +94,17 @@ public class MiningData {
 		// Insel-Erkennung: ZUVERLÄSSIG über die "Area: ..."-Zeile der Tab-Liste
 		// (bleibt in ALLEN Sub-Gebieten gleich), sonst Scoreboard-Stichwörter.
 		boolean mining = false;
+		boolean crystal = false;
 		for (String t : tab) {
 			String lt = t == null ? "" : t.toLowerCase(Locale.ROOT);
 			if (lt.startsWith("area:") && (lt.contains("dwarven mines") || lt.contains("crystal hollows")
 					|| lt.contains("glacite") || lt.contains("mineshaft"))) {
 				mining = true;
+				crystal = lt.contains("crystal hollows");
 				break;
 			}
 		}
+		onCrystalHollows = crystal;
 		if (!mining) {
 			List<String> sidebar = ScoreboardReader.sidebarLines(mc);
 			for (String line : sidebar) {
