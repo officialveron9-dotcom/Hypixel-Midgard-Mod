@@ -21,4 +21,13 @@ public abstract class InGameHudMixin {
 			ci.cancel();
 		}
 	}
+
+	/** Vanilla-Item-Name beim Wechsel ausblenden – wir zeigen ihn selbst. */
+	@Inject(method = "renderHeldItemTooltip(Lnet/minecraft/client/gui/DrawContext;)V",
+			at = @At("HEAD"), cancellable = true)
+	private void midgard$hideHeldItem(DrawContext context, CallbackInfo ci) {
+		if (StatusBars.enabled()) {
+			ci.cancel();
+		}
+	}
 }

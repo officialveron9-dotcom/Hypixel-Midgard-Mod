@@ -128,9 +128,11 @@ public final class Waypoints {
 			return; // zu nah / zu weit für eine sinnvolle Linie
 		}
 		net.minecraft.client.world.ClientWorld world = MinecraftClient.getInstance().world;
-		int steps = Math.max(2, Math.min(60, (int) (dist / 3)));
+		// Dichte Stützpunkte (alle ~1 Block) für eine glatte, verbundene Linie.
+		int steps = Math.max(4, Math.min(160, (int) (dist)));
 		try {
-			for (int i = 1; i <= steps; i++) {
+			int[] prev = null;
+			for (int i = 0; i <= steps; i++) {
 				double t = i / (double) steps;
 				double wx = from.x + (tx - from.x) * t;
 				double wy = from.y + (ty - from.y) * t;
@@ -139,13 +141,27 @@ public final class Waypoints {
 					wy = groundY(world, wx, wy, wz);
 				}
 				int[] s = p.project(wx, wy + 0.1, wz);
-				if (s == null) {
-					continue;
+				if (s != null && prev != null) {
+					thickLine(context, prev[0], prev[1], s[0], s[1], color);
 				}
-				int r = i == steps ? 3 : 2; // Ziel-Ende etwas größer
-				context.fill(s[0] - r, s[1] - r, s[0] + r, s[1] + r, color);
+				prev = s;
 			}
 		} catch (Throwable ignored) {
+		}
+	}
+
+	/** Verbindet zwei Bildschirmpunkte mit einer durchgehenden, dicken Linie. */
+	private static void thickLine(DrawContext c, int x1, int y1, int x2, int y2, int color) {
+		int dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+		int steps = Math.max(dx, dy);
+		if (steps <= 0) {
+			c.fill(x1 - 1, y1 - 1, x1 + 2, y1 + 2, color);
+			return;
+		}
+		for (int i = 0; i <= steps; i++) {
+			int px = x1 + (x2 - x1) * i / steps;
+			int py = y1 + (y2 - y1) * i / steps;
+			c.fill(px - 1, py - 1, px + 2, py + 2, color); // 3px breit
 		}
 	}
 
