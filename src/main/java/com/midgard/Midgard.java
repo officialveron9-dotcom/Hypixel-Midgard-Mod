@@ -46,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14g (Commission-Gebiets-Wegpunkte fuer aktive Missionen + Pfad)");
+		System.out.println("[Midgard] init build=2026-06-14h (A*-Teilweg folgt Boden, Pfad+Marker schoener gerendert)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

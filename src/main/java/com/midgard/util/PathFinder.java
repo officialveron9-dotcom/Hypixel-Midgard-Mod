@@ -22,9 +22,8 @@ import net.minecraft.util.math.Vec3d;
  */
 public final class PathFinder {
 
-	private static final int MAX_EXPAND = 4000;
-	private static final int MAX_RANGE = 80;
-	private static final long RECalc_MS = 700;
+	private static final int MAX_EXPAND = 7000;
+	private static final long RECalc_MS = 600;
 
 	private static volatile List<Vec3d> path = List.of();
 	private static BlockPos lastStart;
@@ -87,26 +86,35 @@ public final class PathFinder {
 	}
 
 	private static List<Vec3d> astar(ClientWorld world, BlockPos start, BlockPos goal) {
-		if (start.getManhattanDistance(goal) > MAX_RANGE * 3) {
+		if (start.getManhattanDistance(goal) > 600) {
 			return straightFallback(start, goal);
 		}
 		BlockPos s = standable(world, start);
-		BlockPos g = nearestStandable(world, goal);
-		if (s == null || g == null) {
+		if (s == null) {
 			return straightFallback(start, goal);
 		}
+		// Begehbares Ziel finden; sonst Richtung Roh-Ziel laufen (Teilweg).
+		BlockPos gs = nearestStandable(world, goal);
+		BlockPos target = gs != null ? gs : goal;
 
 		PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Double.compare(a.f, b.f));
 		Map<Long, Double> best = new HashMap<>();
 		Map<Long, BlockPos> came = new HashMap<>();
-		open.add(new Node(s, 0, heur(s, g)));
+		open.add(new Node(s, 0, heur(s, target)));
 		best.put(s.asLong(), 0.0);
+		BlockPos bestNode = s;
+		double bestH = heur(s, target);
 		int expand = 0;
 
 		while (!open.isEmpty() && expand++ < MAX_EXPAND) {
 			Node cur = open.poll();
 			BlockPos cp = cur.pos;
-			if (cp.isWithinDistance(g, 1.5)) {
+			double ch = heur(cp, target);
+			if (ch < bestH) {
+				bestH = ch;
+				bestNode = cp;
+			}
+			if (cp.isWithinDistance(target, 1.6)) {
 				return build(came, cp, s);
 			}
 			Double bg = best.get(cp.asLong());
@@ -136,13 +144,15 @@ public final class PathFinder {
 						if (old == null || ng < old - 1e-3) {
 							best.put(key, ng);
 							came.put(key, cp);
-							open.add(new Node(np, ng, ng + heur(np, g)));
+							open.add(new Node(np, ng, ng + heur(np, target)));
 						}
 					}
 				}
 			}
 		}
-		return straightFallback(start, goal);
+		// Kein voller Weg gefunden -> Teilweg bis zum nächstgelegenen Punkt
+		// (folgt dem Boden), statt einer geraden Linie durch die Wand.
+		return bestNode.equals(s) ? straightFallback(start, goal) : build(came, bestNode, s);
 	}
 
 	private static double heur(BlockPos a, BlockPos b) {

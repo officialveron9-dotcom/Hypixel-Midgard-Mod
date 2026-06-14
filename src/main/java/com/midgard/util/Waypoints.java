@@ -3,6 +3,7 @@ package com.midgard.util;
 import java.util.List;
 
 import com.midgard.render.MidgardText;
+import com.midgard.render.UIRenderer;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -94,18 +95,35 @@ public final class Waypoints {
 				if (s == null) {
 					continue;
 				}
-				diamond(context, s[0], s[1], m.color());
+				marker(context, s[0], s[1], m.color());
 				double dist = Math.sqrt(sq(m.x() + 0.5 - p.eye.x) + sq(m.y() - p.eye.y) + sq(m.z() + 0.5 - p.eye.z));
-				String label = m.label() + " " + Math.round(dist) + "m";
+				String label = m.label() + "  " + Math.round(dist) + "m";
 				int tw = textW(label);
 				int lx = Math.max(2, Math.min(p.w - tw - 2, s[0] - tw / 2));
-				int ly = s[1] - capH() - 5;
-				context.fill(lx - 2, ly - 2, lx + tw + 2, ly + capH() + 2, 0x90000000);
+				int ly = s[1] - capH() - 10;
+				// Abgerundeter dunkler Hintergrund hinter dem Text.
+				UIRenderer.fillRoundedRect(context, lx - 4, ly - 3, tw + 8, capH() + 6, 3, 0xC0000010);
 				text(context, label, lx, ly, m.color());
 			} catch (Throwable ignored) {
 				// einzelner Marker darf nie alles abreißen
 			}
 		}
+	}
+
+	/** Ziel-Marker: dunkel umrandeter Diamant mit kleinem Glanz – gut sichtbar. */
+	private static void marker(DrawContext c, int cx, int cy, int color) {
+		// dunkler Rand (eine Stufe größer)
+		for (int i = 0; i <= 5; i++) {
+			c.fill(cx - (5 - i), cy - i, cx + (5 - i) + 1, cy - i + 1, 0xC0000000);
+			c.fill(cx - (5 - i), cy + i, cx + (5 - i) + 1, cy + i + 1, 0xC0000000);
+		}
+		// farbige Füllung
+		for (int i = 0; i <= 4; i++) {
+			c.fill(cx - (4 - i), cy - i, cx + (4 - i) + 1, cy - i + 1, color);
+			c.fill(cx - (4 - i), cy + i, cx + (4 - i) + 1, cy + i + 1, color);
+		}
+		// kleiner heller Punkt in der Mitte
+		c.fill(cx - 1, cy - 1, cx + 1, cy + 1, 0xFFFFFFFF);
 	}
 
 	/**
@@ -162,16 +180,44 @@ public final class Waypoints {
 		if (p == null) {
 			return;
 		}
+		int dark = 0xB0000000 | (color & 0xFFFFFF); // dunkler Saum drunter
 		try {
+			// 1) Verbindungslinien (zwei Lagen: dunkler Saum + Farbe darüber).
 			int[] prev = null;
 			for (Vec3d v : pts) {
 				int[] s = p.project(v.x, v.y + 0.1, v.z);
 				if (s != null && prev != null) {
-					thickLine(context, prev[0], prev[1], s[0], s[1], color);
+					softLine(context, prev[0], prev[1], s[0], s[1], dark, color);
 				}
 				prev = s;
 			}
+			// 2) Knoten-Punkte (kleine Quadrate) – Taunahi-artig.
+			for (Vec3d v : pts) {
+				int[] s = p.project(v.x, v.y + 0.1, v.z);
+				if (s != null) {
+					context.fill(s[0] - 2, s[1] - 2, s[0] + 3, s[1] + 3, dark);
+					context.fill(s[0] - 1, s[1] - 1, s[0] + 2, s[1] + 2, color);
+				}
+			}
 		} catch (Throwable ignored) {
+		}
+	}
+
+	/** Linie mit dunklem Saum (4px) und farbiger Mitte (2px) für besseren Kontrast. */
+	private static void softLine(DrawContext c, int x1, int y1, int x2, int y2, int dark, int color) {
+		int steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+		if (steps <= 0) {
+			return;
+		}
+		for (int i = 0; i <= steps; i++) {
+			int px = x1 + (x2 - x1) * i / steps;
+			int py = y1 + (y2 - y1) * i / steps;
+			c.fill(px - 2, py - 2, px + 2, py + 2, dark);
+		}
+		for (int i = 0; i <= steps; i++) {
+			int px = x1 + (x2 - x1) * i / steps;
+			int py = y1 + (y2 - y1) * i / steps;
+			c.fill(px - 1, py - 1, px + 1, py + 1, color);
 		}
 	}
 
