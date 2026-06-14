@@ -114,7 +114,7 @@ public final class PathFinder {
 				bestNode = cp;
 			}
 			if (cp.isWithinDistance(target, 1.6)) {
-				return build(world, came, cp, s);
+				return build(came, cp, s);
 			}
 			Double bg = best.get(cp.asLong());
 			if (bg != null && cur.g > bg + 1e-3) {
@@ -163,7 +163,7 @@ public final class PathFinder {
 		}
 		// Kein voller Weg gefunden -> Teilweg bis zum nächstgelegenen Punkt
 		// (folgt dem Boden), statt einer geraden Linie durch die Wand.
-		return bestNode.equals(s) ? straightFallback(start, goal) : build(world, came, bestNode, s);
+		return bestNode.equals(s) ? straightFallback(start, goal) : build(came, bestNode, s);
 	}
 
 	private static double heur(BlockPos a, BlockPos b) {
@@ -171,7 +171,7 @@ public final class PathFinder {
 		return Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
-	private static List<Vec3d> build(ClientWorld world, Map<Long, BlockPos> came, BlockPos end, BlockPos start) {
+	private static List<Vec3d> build(Map<Long, BlockPos> came, BlockPos end, BlockPos start) {
 		List<BlockPos> nodes = new ArrayList<>();
 		BlockPos c = end;
 		int guard = 0;
@@ -183,95 +183,68 @@ public final class PathFinder {
 			c = came.get(c.asLong());
 		}
 		Collections.reverse(nodes);
-		List<Vec3d> centered = new ArrayList<>();
+		List<Vec3d> pts = new ArrayList<>();
 		for (BlockPos p : nodes) {
-			double[] cxz = centerXZ(world, p);
-			centered.add(new Vec3d(cxz[0], p.getY() + 0.08, cxz[1]));
+			pts.add(new Vec3d(p.getX() + 0.5, p.getY() + 0.08, p.getZ() + 0.5));
 		}
-		// Sichtlinien-Vereinfachung: aufeinanderfolgende Knoten zu langen geraden
-		// Abschnitten zusammenfassen, solange die Luftlinie frei bleibt (keine
-		// Wand dazwischen) und der Abschnitt nicht zu lang wird. Ergebnis hat viel
-		// weniger Stützpunkte -> die Spline-Kurve fließt glatt statt Block-für-Block.
-		return simplify(world, centered);
+		// Douglas-Peucker: macht aus dem Block-für-Block-Treppenmuster wenige,
+		// gerade Segmente (Punkt zu Punkt). Die Linie darf dabei auch mal kurz
+		// in der Luft verlaufen – Hauptsache gerade statt Zickzack.
+		return simplify(pts);
 	}
 
-	/** Maximale Länge eines geraden Abschnitts (Blöcke), bevor ein Stützpunkt bleibt. */
-	private static final double MAX_RUN = 12.0;
+	/** Wie stark vereinfacht wird (Blöcke). Größer = gerader, weniger Stützpunkte. */
+	private static final double DP_EPS = 0.55;
 
-	private static List<Vec3d> simplify(ClientWorld world, List<Vec3d> pts) {
+	private static List<Vec3d> simplify(List<Vec3d> pts) {
 		int sz = pts.size();
 		if (sz < 3) {
 			return pts;
 		}
+		boolean[] keep = new boolean[sz];
+		keep[0] = true;
+		keep[sz - 1] = true;
+		dp(pts, 0, sz - 1, keep);
 		List<Vec3d> out = new ArrayList<>();
-		out.add(pts.get(0));
-		int anchor = 0;
-		for (int i = 1; i < sz - 1; i++) {
-			Vec3d a = pts.get(anchor);
-			Vec3d next = pts.get(i + 1);
-			if (a.distanceTo(next) > MAX_RUN || !clearLine(world, a, next)) {
+		for (int i = 0; i < sz; i++) {
+			if (keep[i]) {
 				out.add(pts.get(i));
-				anchor = i;
 			}
 		}
-		out.add(pts.get(sz - 1));
 		return out;
 	}
 
-	/** Freie Luftlinie zwischen a und b (jede Zelle durchquerbar)? */
-	private static boolean clearLine(ClientWorld world, Vec3d a, Vec3d b) {
-		double dist = a.distanceTo(b);
-		int steps = Math.max(1, (int) (dist / 0.5));
-		for (int s = 0; s <= steps; s++) {
-			double t = (double) s / steps;
-			double x = a.x + (b.x - a.x) * t;
-			double y = a.y + (b.y - a.y) * t;
-			double z = a.z + (b.z - a.z) * t;
-			if (!canFly(world, BlockPos.ofFloored(x, y, z))) {
-				return false;
+	/** Douglas-Peucker: behält den am weitesten von der Geraden abweichenden Punkt. */
+	private static void dp(List<Vec3d> pts, int a, int b, boolean[] keep) {
+		if (b <= a + 1) {
+			return;
+		}
+		Vec3d pa = pts.get(a), pb = pts.get(b);
+		double maxD = -1;
+		int idx = -1;
+		for (int i = a + 1; i < b; i++) {
+			double d = pointSegDist(pts.get(i), pa, pb);
+			if (d > maxD) {
+				maxD = d;
+				idx = i;
 			}
 		}
-		return true;
+		if (maxD > DP_EPS && idx > a) {
+			keep[idx] = true;
+			dp(pts, a, idx, keep);
+			dp(pts, idx, b, keep);
+		}
 	}
 
-	/**
-	 * Rückt einen Knoten quer zur Flur-Richtung in die Mitte des freien Raums.
-	 * Misst die freie Breite nach Osten/Westen/Norden/Süden; ist eine Achse schmal
-	 * (Korridor), wird der Punkt auf die Mitte dieser Achse zentriert. Breite Räume
-	 * bleiben unverändert, damit nichts in die Länge verschoben wird.
-	 */
-	private static double[] centerXZ(ClientWorld world, BlockPos p) {
-		int e = openReach(world, p, 1, 0);
-		int w = openReach(world, p, -1, 0);
-		int s = openReach(world, p, 0, 1);
-		int nn = openReach(world, p, 0, -1);
-		double cx = p.getX() + 0.5;
-		double cz = p.getZ() + 0.5;
-		if (e + w <= 6) { // in x schmal -> quer zentrieren
-			cx += clamp((e - w) * 0.5, -2.5, 2.5);
-		}
-		if (s + nn <= 6) { // in z schmal -> quer zentrieren
-			cz += clamp((s - nn) * 0.5, -2.5, 2.5);
-		}
-		return new double[] { cx, cz };
-	}
-
-	/** Anzahl freier Blöcke (Füße + Kopf) in eine Richtung, max. 5. */
-	private static int openReach(ClientWorld world, BlockPos p, int dx, int dz) {
-		int r = 0;
-		for (int i = 1; i <= 5; i++) {
-			BlockPos q = p.add(dx * i, 0, dz * i);
-			if (passable(world, q) && passable(world, q.up())) {
-				r = i;
-			} else {
-				break;
-			}
-		}
-		return r;
-	}
-
-	private static double clamp(double v, double lo, double hi) {
-		return v < lo ? lo : v > hi ? hi : v;
+	/** Abstand Punkt p zur Strecke a-b (3D). */
+	private static double pointSegDist(Vec3d p, Vec3d a, Vec3d b) {
+		double abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+		double ab2 = abx * abx + aby * aby + abz * abz;
+		double t = ab2 < 1e-9 ? 0 : ((p.x - a.x) * abx + (p.y - a.y) * aby + (p.z - a.z) * abz) / ab2;
+		t = Math.max(0, Math.min(1, t));
+		double cx = a.x + abx * t, cy = a.y + aby * t, cz = a.z + abz * t;
+		double dx = p.x - cx, dy = p.y - cy, dz = p.z - cz;
+		return Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
 

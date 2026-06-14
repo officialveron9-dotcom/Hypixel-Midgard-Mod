@@ -32,7 +32,6 @@ public class Midgard implements ClientModInitializer {
 
 	private static KeyBinding openConfigKey;
 	private static KeyBinding toggleHudKey;
-	private static KeyBinding crystalNavKey;
 
 	private int tickCounter = 0;
 
@@ -47,7 +46,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14y (Kristall-HUD+Diagnose, NPCs aus Wiki, Navi-Menue im HUD-Stil)");
+		System.out.println("[Midgard] init build=2026-06-14z (Pfad gerade per Douglas-Peucker+vor dem Spieler, EIN Stil, Navi komplett im HUD)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).
@@ -70,12 +69,6 @@ public class Midgard implements ClientModInitializer {
 				"key.midgard.togglehud",
 				InputUtil.Type.KEYSYM,
 				GLFW.GLFW_KEY_UNKNOWN, // standardmäßig nicht belegt
-				category));
-
-		crystalNavKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-				"key.midgard.crystalnav",
-				InputUtil.Type.KEYSYM,
-				GLFW.GLFW_KEY_N,
 				category));
 
 		// Abgebaute Blöcke an den Farming-Tracker melden (Blöcke/s + Crop-Erkennung).
@@ -107,11 +100,9 @@ public class Midgard implements ClientModInitializer {
 							return true;
 						}
 						try {
-							EventHud.GroupRect r =
-									EventHud.INSTANCE.liveRect(config, com.midgard.mining.MiningHud.KEY_NAV);
-							if (r != null && r.contains(click.x(), click.y())) {
-								client.setScreen(new com.midgard.events.gui.NavScreen(null));
-								return false; // Klick verbraucht (nicht an den Chat)
+							// Klick auf die Navi-Liste im HUD -> Ziel setzen (nicht an den Chat).
+							if (com.midgard.events.hud.NaviHud.INSTANCE.clickAt(click.x(), click.y())) {
+								return false;
 							}
 						} catch (Throwable t) {
 							logOnce("ChatKlick", t);
@@ -154,9 +145,6 @@ public class Midgard implements ClientModInitializer {
 			while (toggleHudKey.wasPressed()) {
 				config.masterEnabled = !config.masterEnabled;
 				config.save();
-			}
-			while (crystalNavKey.wasPressed()) {
-				client.setScreen(new com.midgard.events.gui.NavScreen(client.currentScreen));
 			}
 
 			// Jeden Tick: offenes Kalender-/Jacob-GUI auslesen (nur lesend).
@@ -208,6 +196,11 @@ public class Midgard implements ClientModInitializer {
 					EventHud.INSTANCE.render(context);
 				} catch (Throwable t) {
 					logOnce("HUD", t);
+				}
+				try {
+					com.midgard.events.hud.NaviHud.INSTANCE.render(context);
+				} catch (Throwable t) {
+					logOnce("NaviHud", t);
 				}
 			}
 			try {

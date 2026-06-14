@@ -120,24 +120,7 @@ public final class MiningHud {
 			out.add(new HudGroup(KEY_EVENT, "Mining-Event", rows, Items.GUNPOWDER));
 		}
 
-		// 5) Navi-Ziel: aktuelles Navigations-Ziel (Auswahl per N-Taste).
-		if (vis(cfg, KEY_NAV, preview)) {
-			String tgt;
-			if (preview) {
-				tgt = "Crystal Nucleus";
-			} else if (CrystalNav.hasTarget()) {
-				tgt = CrystalNav.targetName();
-			} else if (MiningWaypoints.hasManual()) {
-				tgt = MiningWaypoints.manual().label();
-			} else {
-				com.midgard.util.Waypoints.Marker n = MiningWaypoints.nearest();
-				tgt = n != null ? n.label() : null;
-			}
-			List<HudRow> rows = new ArrayList<>();
-			rows.add(new HudRow("", tgt != null ? tgt : "kein Ziel (N)",
-					tgt != null ? GREEN : DIM, List.of(), false));
-			out.add(new HudGroup(KEY_NAV, "Navi", rows, Items.COMPASS));
-		}
+		// (Navi-Ziel-Auswahl liegt jetzt in NaviHud – eigene klickbare HUD-Liste.)
 
 		// 6) Kristalle (nur in Crystal Hollows): abgegeben / noch offen.
 		if (cfg.isElementEnabled(KEY_CRYSTALS) && (preview || MiningData.INSTANCE.onCrystalHollows)) {
