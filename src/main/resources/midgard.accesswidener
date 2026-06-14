@@ -1,0 +1,4 @@
+accessWidener	v2	named
+
+# RenderLayer.of fuer eigene tiefengetestete Fuell-Layer (Pfad-Rendering)
+accessible	method	net/minecraft/client/render/RenderLayer	of	(Ljava/lang/String;Lnet/minecraft/client/render/RenderSetup;)Lnet/minecraft/client/render/RenderLayer;

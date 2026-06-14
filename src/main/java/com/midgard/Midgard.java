@@ -47,7 +47,7 @@ public class Midgard implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		System.out.println("[Midgard] init build=2026-06-14w (Tiefentest-Stile=Standard/in-world, Linie bleibt am Boden, Block-Rahmen)");
+		System.out.println("[Midgard] init build=2026-06-14x (echte 3D-Geometrie statt LINES: kein Schwimmen, Perspektive, eigene Tiefen-Layer via AW)");
 		config = ModConfig.load();
 
 		// Optionales globales Roboto-Font-Pack registrieren (Schalter im Menü).

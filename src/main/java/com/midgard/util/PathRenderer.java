@@ -9,6 +9,9 @@ import org.joml.Matrix4f;
 
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
+import com.midgard.render.MidgardLayers;
+
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
@@ -17,19 +20,18 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Vec3d;
 
 /**
- * Zeichnet den {@link PathFinder}-Pfad ECHT in der 3D-Welt. Die Knoten werden
- * vorher per Catmull-Rom-Spline zu einer weichen Kurve verdichtet (keine
- * sichtbaren Knicke). Stile (config.pathStyle):
- * <ul>
- *   <li>0 = Linie (Tiefe): tiefengetestet ({@code RenderLayers.LINES}) – von
- *       Blöcken verdeckt, geht NICHT durch Wände.</li>
- *   <li>1 = Bändchen (durch Wände): breites flaches Band, immer sichtbar.</li>
- *   <li>2 = Würfel-Spur: kleine Würfel an den Knoten, immer sichtbar.</li>
- *   <li>3 = Linie (durch Wände): dünnes Band, immer sichtbar.</li>
- *   <li>4 = Boden-Glühen: leuchtendes Band flach auf dem Boden (Standard).</li>
- * </ul>
- * Alle Stile nutzen einen EIGENEN Vertex-Puffer (nicht den geteilten der
- * Engine) – ein Fehler hier kann die Engine daher NIE zum Absturz bringen.
+ * Zeichnet den {@link PathFinder}-Pfad als ECHTE 3D-Geometrie in der Welt.
+ *
+ * <p>WICHTIG für den „in-world"-Look: Es werden ausschließlich weltraum-feste
+ * Dreiecke/Quads gezeichnet (Bändchen, Würfel, Boden-Band). Dadurch wird der
+ * Pfad mit Entfernung korrekt KLEINER (Perspektive) und SCHWIMMT NICHT beim
+ * Bewegen/Drehen – anders als die {@code LINES}-Layer, die in Bildschirm-Pixeln
+ * expandiert (konstante Breite, „verzieht" sich beim Drehen).</p>
+ *
+ * <p>Die „Tiefe"-Stile nutzen eine selbstgebaute, TIEFENGETESTETE Füll-Layer
+ * ({@link MidgardRenderLayers}) – so verdeckt das Terrain den Pfad korrekt.
+ * Klappt der Aufbau nicht, wird automatisch auf {@code debugQuads} (ohne Tiefe)
+ * ausgewichen. Eigener Vertex-Puffer -> kann die Engine nie crashen.</p>
  */
 public final class PathRenderer {
 
@@ -62,7 +64,7 @@ public final class PathRenderer {
 			immediate = VertexConsumerProvider.immediate(allocator);
 		}
 
-		int style = 4;
+		int style = 0;
 		try {
 			if (com.midgard.Midgard.config != null) {
 				style = com.midgard.Midgard.config.pathStyle;
@@ -70,13 +72,13 @@ public final class PathRenderer {
 		} catch (Throwable ignored) {
 		}
 		if (style < 0 || style > 5) {
-			style = 4;
+			style = 0;
 		}
 
-		// Nur den noch offenen Rest zeichnen: ab dem horizontal nächsten Knoten.
-		// Den Startpunkt auf die BODENHÖHE dieses Knotens legen – so bleibt die
-		// Linie am Boden, auch wenn man springt/fliegt (geht nicht in die Luft).
 		int n = path.size();
+		// Nächsten Knoten NUR horizontal suchen (Y ignorieren) und den Startpunkt
+		// auf die BODENHÖHE dieses Knotens legen -> die Linie bleibt am Boden,
+		// auch wenn man springt/fliegt (geht nicht mit in die Luft).
 		double px = mc.player.getX(), pz = mc.player.getZ();
 		int startIdx = 0;
 		double bestD = Double.MAX_VALUE;
@@ -90,7 +92,7 @@ public final class PathRenderer {
 		}
 		Vec3d feet = new Vec3d(px, path.get(startIdx).y, pz);
 
-		// Rohpunkte (Füße + restliche Knoten, ggf. ausgedünnt) -> Spline.
+		// Rohpunkte (Füße am Boden + restliche Knoten, ggf. ausgedünnt).
 		int step = Math.max(1, (n - startIdx) / MAX_SEG);
 		List<Vec3d> raw = new ArrayList<>();
 		raw.add(feet);
@@ -103,61 +105,68 @@ public final class PathRenderer {
 
 		ms.push();
 		ms.translate(-cam.x, -cam.y, -cam.z);
-		MatrixStack.Entry entry = ms.peek();
-		Matrix4f m = entry.getPositionMatrix();
+		Matrix4f m = ms.peek().getPositionMatrix();
 
-		// Gerade Segmente direkt zwischen den (bereits vereinfachten) Punkten –
-		// kein Spline mehr, dadurch keine Wellen. Punkt-zu-Punkt schnurgerade.
-		if (style == 2) {
-			// Würfel-Spur an den Knoten.
-			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
-			for (int i = 1; i < raw.size(); i++) {
-				box(vc, m, raw.get(i), 0.11f, 200);
-			}
-		} else if (style == 5) {
-			// Leucht-Blöcke: leuchtender Rahmen um den ECHTEN Bodenblock, TIEFEN-
-			// getestet (hugt die Blockkanten, wird vom Terrain verdeckt) -> wirkt in
-			// der Welt statt wie auf den Bildschirm geklebt. Kein Extra-Teil.
-			VertexConsumer frame = immediate.getBuffer(RenderLayers.LINES);
-			Set<Long> seen = new HashSet<>();
-			for (Vec3d p : densify(raw, 0.4)) {
-				int bx = (int) Math.floor(p.x);
-				int bz = (int) Math.floor(p.z);
-				int floorY = (int) Math.floor(p.y - 0.08) - 1; // fester Block unter den Füßen
-				if (!seen.add(net.minecraft.util.math.BlockPos.asLong(bx, floorY, bz))) {
-					continue;
+		// Tiefengetestete Füll-Layer (wird vom Terrain verdeckt). Fällt sie aus,
+		// nutzt fillVc() automatisch debugQuads (ohne Tiefe). "thru" = absichtlich
+		// durch Wände sichtbar (debugQuads).
+		VertexConsumer depth = fillVc();
+		VertexConsumer thru = immediate.getBuffer(RenderLayers.debugQuads());
+
+		switch (style) {
+			case 1: // Bändchen (durch Wände)
+				for (int i = 0; i + 1 < raw.size(); i++) {
+					tube(thru, m, raw.get(i), raw.get(i + 1), 0.14f, 0.05f, 200);
 				}
-				blockFrame(frame, entry, m, bx, floorY, bz, 3.5f);
-			}
-		} else if (style == 0) {
-			// Tiefengetestete Linie – von Blöcken verdeckt.
-			VertexConsumer vc = immediate.getBuffer(RenderLayers.LINES);
-			for (int i = 0; i + 1 < raw.size(); i++) {
-				line(vc, entry, m, raw.get(i), raw.get(i + 1), 6f, 255);
-			}
-		} else if (style == 4) {
-			// Boden-Glühen: Band flach auf dem Boden (zwei Lagen für Glow).
-			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
-			for (int i = 0; i + 1 < raw.size(); i++) {
-				floorBand(vc, m, raw.get(i), raw.get(i + 1), 0.46f, 70);
-			}
-			for (int i = 0; i + 1 < raw.size(); i++) {
-				floorBand(vc, m, raw.get(i), raw.get(i + 1), 0.17f, 185);
-			}
-		} else {
-			// Band (durch Wände): breit (1) oder dünn (3).
-			float tH = style == 3 ? 0.05f : 0.14f;
-			VertexConsumer vc = immediate.getBuffer(RenderLayers.debugQuads());
-			for (int i = 0; i + 1 < raw.size(); i++) {
-				tube(vc, m, raw.get(i), raw.get(i + 1), tH, 0.04f, 200);
-			}
+				break;
+			case 2: // Würfel-Spur (Tiefe)
+				for (int i = 1; i < raw.size(); i++) {
+					box(depth, m, raw.get(i), 0.11f, 210);
+				}
+				break;
+			case 3: // dünne Linie (durch Wände)
+				for (int i = 0; i + 1 < raw.size(); i++) {
+					tube(thru, m, raw.get(i), raw.get(i + 1), 0.05f, 0.04f, 200);
+				}
+				break;
+			case 4: // Boden-Glühen (Tiefe): Band flach auf dem Boden, zwei Lagen
+				for (int i = 0; i + 1 < raw.size(); i++) {
+					floorBand(depth, m, raw.get(i), raw.get(i + 1), 0.46f, 70);
+				}
+				for (int i = 0; i + 1 < raw.size(); i++) {
+					floorBand(depth, m, raw.get(i), raw.get(i + 1), 0.17f, 185);
+				}
+				break;
+			case 5: // Leucht-Blöcke (Tiefe): Rahmen um den echten Bodenblock
+				Set<Long> seen = new HashSet<>();
+				for (Vec3d p : densify(raw, 0.4)) {
+					int bx = (int) Math.floor(p.x);
+					int bz = (int) Math.floor(p.z);
+					int floorY = (int) Math.floor(p.y - 0.08) - 1;
+					if (!seen.add(net.minecraft.util.math.BlockPos.asLong(bx, floorY, bz))) {
+						continue;
+					}
+					blockFrame(depth, m, bx, floorY, bz, 0.03f);
+				}
+				break;
+			default: // 0: 3D-Linie (Tiefe) – Standard, in-world
+				for (int i = 0; i + 1 < raw.size(); i++) {
+					tube(depth, m, raw.get(i), raw.get(i + 1), 0.09f, 0.05f, 215);
+				}
+				break;
 		}
 
 		ms.pop();
 		immediate.draw();
 	}
 
-	// ---- Glättung ---------------------------------------------------------
+	/** VertexConsumer der tiefengetesteten Füll-Layer (oder debugQuads als Fallback). */
+	private static VertexConsumer fillVc() {
+		RenderLayer depthLayer = MidgardLayers.depthQuads();
+		return immediate.getBuffer(depthLayer != null ? depthLayer : RenderLayers.debugQuads());
+	}
+
+	// ---- Geometrie --------------------------------------------------------
 
 	/** Punkte linear entlang der geraden Strecke verdichten (für die Leucht-Blöcke). */
 	private static List<Vec3d> densify(List<Vec3d> pts, double stepLen) {
@@ -178,46 +187,28 @@ public final class PathRenderer {
 		return out;
 	}
 
-	// ---- Primitive --------------------------------------------------------
-
-	/** Eine tiefengetestete Linie a->b über die LINES-Layer (Breite per Vertex). */
-	private static void line(VertexConsumer vc, MatrixStack.Entry e, Matrix4f m, Vec3d a, Vec3d b, float w, int alpha) {
-		double dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-		double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
-		if (len < 1e-5) {
-			return;
-		}
-		float nx = (float) (dx / len), ny = (float) (dy / len), nz = (float) (dz / len);
-		// Format POSITION_COLOR_NORMAL_LINE_WIDTH -> exakt diese Reihenfolge.
-		vc.vertex(m, (float) a.x, (float) a.y, (float) a.z).color(R, G, B, alpha).normal(e, nx, ny, nz).lineWidth(w);
-		vc.vertex(m, (float) b.x, (float) b.y, (float) b.z).color(R, G, B, alpha).normal(e, nx, ny, nz).lineWidth(w);
-	}
-
-	/** Leuchtender Rahmen um einen ganzen Block (12 Kanten, tiefengetestet). */
-	private static void blockFrame(VertexConsumer vc, MatrixStack.Entry e, Matrix4f m, int bx, int by, int bz, float w) {
-		float o = 0.004f; // minimal außerhalb -> kein Z-Fighting mit der Blockfläche
-		double x0 = bx - o, x1 = bx + 1 + o;
-		double y0 = by - o, y1 = by + 1 + o;
-		double z0 = bz - o, z1 = bz + 1 + o;
+	/** Rahmen um einen ganzen Block (12 dünne 3D-Kanten). */
+	private static void blockFrame(VertexConsumer vc, Matrix4f m, int bx, int by, int bz, float t) {
+		double x0 = bx, x1 = bx + 1, y0 = by, y1 = by + 1, z0 = bz, z1 = bz + 1;
 		Vec3d c000 = new Vec3d(x0, y0, z0), c100 = new Vec3d(x1, y0, z0);
 		Vec3d c101 = new Vec3d(x1, y0, z1), c001 = new Vec3d(x0, y0, z1);
 		Vec3d c010 = new Vec3d(x0, y1, z0), c110 = new Vec3d(x1, y1, z0);
 		Vec3d c111 = new Vec3d(x1, y1, z1), c011 = new Vec3d(x0, y1, z1);
-		// untere Kante
-		line(vc, e, m, c000, c100, w, 255);
-		line(vc, e, m, c100, c101, w, 255);
-		line(vc, e, m, c101, c001, w, 255);
-		line(vc, e, m, c001, c000, w, 255);
-		// obere Kante
-		line(vc, e, m, c010, c110, w, 255);
-		line(vc, e, m, c110, c111, w, 255);
-		line(vc, e, m, c111, c011, w, 255);
-		line(vc, e, m, c011, c010, w, 255);
-		// senkrechte Kanten
-		line(vc, e, m, c000, c010, w, 255);
-		line(vc, e, m, c100, c110, w, 255);
-		line(vc, e, m, c101, c111, w, 255);
-		line(vc, e, m, c001, c011, w, 255);
+		// untere 4 Kanten
+		tube(vc, m, c000, c100, t, t, 230);
+		tube(vc, m, c100, c101, t, t, 230);
+		tube(vc, m, c101, c001, t, t, 230);
+		tube(vc, m, c001, c000, t, t, 230);
+		// obere 4 Kanten
+		tube(vc, m, c010, c110, t, t, 230);
+		tube(vc, m, c110, c111, t, t, 230);
+		tube(vc, m, c111, c011, t, t, 230);
+		tube(vc, m, c011, c010, t, t, 230);
+		// 4 senkrechte Kanten
+		tube(vc, m, c000, c010, t, t, 230);
+		tube(vc, m, c100, c110, t, t, 230);
+		tube(vc, m, c101, c111, t, t, 230);
+		tube(vc, m, c001, c011, t, t, 230);
 	}
 
 	/** Flaches, waagerechtes Band auf dem Boden (für das Boden-Glühen). */
@@ -227,17 +218,17 @@ public final class PathRenderer {
 		if (len < 1e-5) {
 			return;
 		}
-		double px = -dz / len * halfW, pz = dx / len * halfW; // senkrecht in XZ
+		double pxx = -dz / len * halfW, pzz = dx / len * halfW; // senkrecht in XZ
 		float ay = (float) a.y, by = (float) b.y;
-		float[] a1 = { (float) (a.x + px), ay, (float) (a.z + pz) };
-		float[] a2 = { (float) (a.x - px), ay, (float) (a.z - pz) };
-		float[] b1 = { (float) (b.x + px), by, (float) (b.z + pz) };
-		float[] b2 = { (float) (b.x - px), by, (float) (b.z - pz) };
+		float[] a1 = { (float) (a.x + pxx), ay, (float) (a.z + pzz) };
+		float[] a2 = { (float) (a.x - pxx), ay, (float) (a.z - pzz) };
+		float[] b1 = { (float) (b.x + pxx), by, (float) (b.z + pzz) };
+		float[] b2 = { (float) (b.x - pxx), by, (float) (b.z - pzz) };
 		quad(vc, m, a1, a2, b2, b1, alpha);
-		quad(vc, m, a1, b1, b2, a2, alpha); // Rückseite, damit von beiden Seiten sichtbar
+		quad(vc, m, a1, b1, b2, a2, alpha); // Rückseite (von beiden Seiten sichtbar)
 	}
 
-	/** Flaches Bändchen (Röhre) von a nach b – durch Wände sichtbar. */
+	/** 3D-Bändchen (Quader-Röhre) von a nach b – echte Weltgeometrie. */
 	private static void tube(VertexConsumer vc, Matrix4f m, Vec3d a, Vec3d b, float tH, float tV, int alpha) {
 		double dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
 		double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
