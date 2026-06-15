@@ -1,6 +1,11 @@
 name: Update Prices
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'price-backend/**'
+      - '.github/workflows/update.yml'
   schedule:
     - cron: '*/5 * * * *'   # alle 5 Minuten
   workflow_dispatch:
