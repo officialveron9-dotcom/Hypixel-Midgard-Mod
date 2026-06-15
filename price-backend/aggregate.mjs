@@ -30,29 +30,40 @@ async function bazaar() {
 }
 
 // ---- Auktionshaus -------------------------------------------------------
-// Die SkyBlock-Item-ID steckt im NBT (item_bytes, base64+gzip).
-async function skyblockId(itemBytes) {
+// Die SkyBlock-Item-ID + Sterne stecken im NBT (item_bytes, base64+gzip).
+async function parseItem(itemBytes) {
 	try {
 		const { parsed } = await nbt.parse(Buffer.from(itemBytes, 'base64'));
-		const items = parsed.value?.i?.value?.value;
-		const tag = items?.[0]?.tag?.value;
-		return tag?.ExtraAttributes?.value?.id?.value || null;
+		const ea = parsed.value?.i?.value?.value?.[0]?.tag?.value?.ExtraAttributes?.value;
+		const id = ea?.id?.value || null;
+		let stars = ea?.upgrade_level?.value;
+		if (stars == null) stars = ea?.dungeon_item_level?.value;
+		stars = Math.max(0, Math.min(10, (stars | 0)));
+		return { id, stars };
 	} catch {
-		return null;
+		return { id: null, stars: 0 };
 	}
 }
 
-async function auctions() {
+// Liefert BEIDES in einem Durchgang: Preis-Statistik je Item (für Tooltips) UND
+// den kompakten Voll-Snapshot ALLER Live-Auktionen (für den AH-Browser).
+// Kurze Keys halten den Snapshot klein: u=uuid i=id n=name t=tier c=category
+// p=preis b=bin e=endzeit d=gebote s=sterne.
+async function auctionsAndSnapshot() {
 	const first = await getJson('https://api.hypixel.net/v2/skyblock/auctions?page=0');
 	const pages = first.totalPages || 1;
-	const byId = {}; // SkyBlock-ID -> Liste der BIN-Preise
+	const byId = {};      // SkyBlock-ID -> Liste der BIN-Preise
+	const snapshot = [];  // alle Auktionen kompakt
 
 	const handlePage = async (aucs) => {
 		await Promise.all((aucs || []).map(async (a) => {
-			if (!a.bin) return; // nur Sofortkauf (BIN) als Preisreferenz
-			const id = await skyblockId(a.item_bytes);
-			if (!id) return;
-			(byId[id] ||= []).push(a.starting_bid);
+			const { id, stars } = await parseItem(a.item_bytes);
+			snapshot.push({
+				u: a.uuid, i: id || '', n: a.item_name || '', t: a.tier || '',
+				c: a.category || '', p: a.starting_bid, b: a.bin ? 1 : 0,
+				e: a.end, d: Array.isArray(a.bids) ? a.bids.length : 0, s: stars
+			});
+			if (a.bin && id) (byId[id] ||= []).push(a.starting_bid);
 		}));
 	};
 
@@ -66,19 +77,16 @@ async function auctions() {
 		}
 	}
 
-	const out = {};
+	const stats = {};
 	for (const [id, arr] of Object.entries(byId)) {
 		arr.sort((a, b) => a - b);
 		const sum = arr.reduce((s, x) => s + x, 0);
-		out[id] = {
-			min: arr[0],
-			max: arr[arr.length - 1],
-			avg: Math.round(sum / arr.length),
-			lowestBin: arr[0],
-			count: arr.length
+		stats[id] = {
+			min: arr[0], max: arr[arr.length - 1],
+			avg: Math.round(sum / arr.length), lowestBin: arr[0], count: arr.length
 		};
 	}
-	return out;
+	return { auctions: stats, snapshot };
 }
 
 // ---- Jacob-Zeitplan (von elitebot.dev, 1x pro Lauf) ---------------------
@@ -93,18 +101,18 @@ async function jacob() {
 }
 
 // ---- Zusammenbauen + schreiben -----------------------------------------
-const out = {
-	updated: Math.floor(Date.now() / 1000),
-	source: 'Hypixel API + elitebot.dev',
-	bazaar: await bazaar(),
-	auctions: await auctions(),
-	jacob: await jacob()
-};
+const updated = Math.floor(Date.now() / 1000);
+const [bz, ah, jc] = await Promise.all([bazaar(), auctionsAndSnapshot(), jacob()]);
+
+const prices = { updated, source: 'Hypixel API + elitebot.dev', bazaar: bz, auctions: ah.auctions, jacob: jc };
+const snapshot = { updated, count: ah.snapshot.length, auctions: ah.snapshot };
 
 await mkdir('public', { recursive: true });
-await writeFile('public/prices.json', JSON.stringify(out));
+await writeFile('public/prices.json', JSON.stringify(prices));
+await writeFile('public/snapshot.json', JSON.stringify(snapshot));
 console.log(
-	`OK: ${Object.keys(out.bazaar).length} Bazaar, ` +
-	`${Object.keys(out.auctions).length} AH-Items, ` +
-	`${Object.keys(out.jacob).length} Jacob-Contests`
+	`OK: ${Object.keys(prices.bazaar).length} Bazaar, ` +
+	`${Object.keys(prices.auctions).length} AH-Items, ` +
+	`${snapshot.count} Auktionen im Snapshot, ` +
+	`${Object.keys(prices.jacob).length} Jacob-Contests`
 );
